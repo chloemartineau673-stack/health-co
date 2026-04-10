@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Balises pour l'installation sur téléphone (Mode App) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#f4f7f6">
+
+    <title>Mon Dashboard Personnel</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* --- DESIGN (CSS) --- */
+        :root {
+            /* Couleurs Néon */
+            --neon-green: #54ff36; /* Vert électrique pour le sport */
+            --neon-blue: #00FFFF; /* Cyan électrique pour l'eau */
+            --neon-orange: #f389ca; /* Orange vif pour les protéines */
+            --neon-yellow: #dd45c6; /* Jaune pur pour les glucides */
+            --neon-magenta: #da76e5; /* Magenta électrique pour les lipides (inchangé) */
+            --neon-weight: #8e44ad; /* Violet pour le poids */
+            --neon-purple: var(--neon-green); /* Vert néon pour les boutons reset (comme la peau de la pastèque) */
+            --neon-default-button: #ff4690; /* Rose/rouge néon pour les boutons par défaut (comme la chair de la pastèque) */
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #f4f7f6; /* Garde un fond clair pour l'instant */
+            padding: 20px;
+        }
+        .dashboard { 
+            display: grid; 
+            grid-template-columns: repeat(4, 1fr); 
+            gap: 20px; 
+            max-width: 1600px; 
+            margin: auto; 
+        }
+        .full-width { grid-column: 1 / -1; } /* Pour que le graphique prenne toute la largeur */
+        section { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h2 { color: #2c3e50; margin-top: 0; }
+
+        /* --- RESPONSIVE DESIGN --- */
+        @media (max-width: 1200px) {
+            .dashboard { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 600px) {
+            .dashboard { grid-template-columns: 1fr; }
+            body { padding: 10px; }
+        }
+        
+        /* Barres de progression */
+        .progress-container { background: #eee; border-radius: 20px; height: 25px; width: 100%; margin: 10px 0; }
+        .progress-bar {
+            height: 100%;
+            border-radius: 20px;
+            width: 0%;
+            transition: width 0.5s, box-shadow 0.3s; /* Ajout de box-shadow à la transition */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            position: relative; /* Indispensable pour que l'explosion puisse sortir du cadre */
+            font-size: 12px;
+            font-weight: bold;
+            /* Effet néon pour les barres de progression */
+            box-shadow: 0 0 10px var(--bar-glow);
+        }
+        
+        /* Couleurs spécifiques */
+        .bg-sport { background-color: var(--neon-green); --bar-glow: var(--neon-green); }
+        .bg-water { background-color: var(--neon-blue); --bar-glow: var(--neon-blue); }
+        .bg-protein { background-color: var(--neon-orange); --bar-glow: var(--neon-orange); }
+        .bg-carbs { background-color: var(--neon-yellow); --bar-glow: var(--neon-yellow); }
+        .bg-fat { background-color: var(--neon-magenta); --bar-glow: var(--neon-magenta); }
+        .bg-weight { background-color: var(--neon-weight); --bar-glow: var(--neon-weight); }
+
+        button {
+            background: var(--neon-default-button); /* Couleur néon par défaut pour les boutons */
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 2px;
+            transition: background 0.3s, box-shadow 0.3s;
+            /* Effet néon pour les boutons */
+            box-shadow: 0 0 5px var(--neon-default-button), 0 0 10px var(--neon-default-button);
+        }
+        button:hover {
+            opacity: 0.9; /* Légèrement moins opaque au survol */
+            box-shadow: 0 0 8px var(--neon-default-button), 0 0 15px var(--neon-default-button); /* Lueur plus forte au survol */
+        }
+        .btn-red {
+            background-color: var(--neon-purple); /* Violet néon pour les boutons reset */
+            box-shadow: 0 0 5px var(--neon-purple), 0 0 10px var(--neon-purple); /* Lueur néon pour les boutons reset */
+        }
+        .btn-red:hover {
+            opacity: 0.9;
+            box-shadow: 0 0 8px var(--neon-purple), 0 0 15px var(--neon-purple);
+        }
+        
+        input { padding: 8px; border: 1px solid #ddd; border-radius: 5px; width: 100px; margin-bottom: 5px; }
+
+        /* Animation d'explosion néon */
+        @keyframes neon-explosion {
+            0% { transform: scale(1); filter: brightness(1); box-shadow: 0 0 10px var(--bar-glow); }
+            40% { transform: scale(1.15); filter: brightness(4); box-shadow: 0 0 50px white, 0 0 100px var(--bar-glow); }
+            100% { transform: scale(1); filter: brightness(1); box-shadow: 0 0 10px var(--bar-glow); }
+        }
+
+        /* Classe déclenchée par le JavaScript */
+        .animate-explosion {
+            animation: neon-explosion 0.6s ease-in-out;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+
+    <h1 style="text-align: center;">🍉 Health&Co 🍉</h1>
+
+    <div class="dashboard">
+        
+        <section id="sport">
+            <h2>🏋️ Activité Sportive</h2>
+           <p>Objectif semaine : 
+    <input type="number" id="sport-goal-input" style="width: 60px;" onchange="updateSportGoal()"> min
+</p>
+            <div class="progress-container">
+                <div id="sport-bar" class="progress-bar bg-sport">0%</div>
+            </div>
+            <p>Temps cumulé : <span id="current-sport">0</span> min</p>
+            
+            <input type="number" id="sport-input" placeholder="Min">
+            <input type="text" id="sport-type" placeholder="Sport">
+            <button onclick="addSport()">Ajouter</button>
+            <br><br>
+            <button class="btn-red" onclick="resetSport()">Reset semaine</button>
+            <ul id="sport-history" style="font-size: 0.8em; color: #666;"></ul>
+        </section>
+
+        <section id="water">
+            <h2>💧 Hydratation</h2>
+            <p>Objectif jour : <strong>2 Litres</strong></p>
+            <div class="progress-container">
+                <div id="water-bar" class="progress-bar bg-water">0%</div>
+            </div>
+            <p>Aujourd'hui : <span id="water-count">0</span> L</p>
+            <button onclick="addWater(0.25)">+ 250ml</button>
+            <button onclick="addWater(0.5)">+ 500ml</button>
+            <br><br>
+            <button class="btn-red" onclick="resetWater()">Vider (Reset jour)</button>
+        </section>
+
+        <section id="nutrition">
+            <h2>🥗 Nutrition</h2>
+            <p>Objectifs journaliers :</p>
+            <div style="display: flex; justify-content: space-around; margin-bottom: 15px;">
+                <div>
+                    Prot. : <input type="number" id="protein-goal-input" style="width: 50px;" onchange="updateNutritionGoals()"> g
+                </div>
+                <div>
+                    Gluc. : <input type="number" id="carbs-goal-input" style="width: 50px;" onchange="updateNutritionGoals()"> g
+                </div>
+                <div>
+                    Lip. : <input type="number" id="fat-goal-input" style="width: 50px;" onchange="updateNutritionGoals()"> g
+                </div>
+            </div>
+
+            <h3>Macros du jour :</h3>
+            <p>Total Calories: <span id="total-calories">0</span> kcal</p>
+
+            <p>Protéines: <span id="current-protein">0</span> g</p>
+            <div class="progress-container">
+                <div id="protein-bar" class="progress-bar bg-protein">0%</div>
+            </div>
+
+            <p>Glucides: <span id="current-carbs">0</span> g</p>
+            <div class="progress-container">
+                <div id="carbs-bar" class="progress-bar bg-carbs">0%</div>
+            </div>
+
+            <p>Lipides: <span id="current-fat">0</span> g</p>
+            <div class="progress-container">
+                <div id="fat-bar" class="progress-bar bg-fat">0%</div>
+            </div>
+
+            <hr style="margin: 20px 0;">
+
+            <p>Ajouter un repas:</p>
+            <input type="number" id="add-protein" placeholder="Prot. (g)" style="width: 80px;">
+            <input type="number" id="add-carbs" placeholder="Gluc. (g)" style="width: 80px;">
+            <input type="number" id="add-fat" placeholder="Lip. (g)" style="width: 80px;">
+            <button onclick="addNutrition()">Ajouter</button>
+            <button class="btn-red" onclick="resetNutrition()">Reset jour</button>
+        </section>
+
+        <section id="weight">
+            <h2>⚖️ Suivi du Poids</h2>
+            <p>Objectif de poids : 
+                <input type="number" id="weight-goal-input" style="width: 60px;" onchange="updateWeightGoal()"> kg
+            </p>
+            <p>Poids actuel : <span id="current-weight">0.0</span> kg</p>
+            <div class="progress-container">
+                <div id="weight-bar" class="progress-bar bg-weight">0%</div>
+            </div>
+
+            <hr style="margin: 20px 0;">
+
+            <p>Enregistrer le poids :</p>
+            <input type="number" id="add-weight" placeholder="Poids (kg)" style="width: 80px;">
+            <button onclick="addWeight()">Enregistrer</button>
+            <br><br>
+            <button class="btn-red" onclick="resetWeight()">Reset Poids</button>
+
+            <!-- Correction : Ajout du canvas manquant pour éviter le crash du script -->
+            <div style="margin-top: 20px;">
+                <canvas id="weightChart" height="200"></canvas>
+            </div>
+        </section>
+
+        <!-- Section Graphique Annuel -->
+        <section id="stats" class="full-width">
+            <h2>📊 Volume Sportif Annuel (h)</h2>
+            <canvas id="sportChart" height="100"></canvas>
+        </section>
+
+    </div>
+
+    <script>
+       // 1. Initialisation (On récupère les totaux ET l'objectif sauvegardé)
+let totalSport = parseInt(localStorage.getItem('saveSport')) || 0;
+let totalWater = parseFloat(localStorage.getItem('saveWater')) || 0;
+let totalProtein = parseFloat(localStorage.getItem('saveProtein')) || 0;
+let totalCarbs = parseFloat(localStorage.getItem('saveCarbs')) || 0;
+let totalFat = parseFloat(localStorage.getItem('saveFat')) || 0;
+let currentWeight = parseFloat(localStorage.getItem('saveWeight')) || 0;
+let weightGoal = parseFloat(localStorage.getItem('saveWeightGoal')) || 60; // Valeur par défaut si rien n'est sauvegardé
+
+// On récupère l'objectif sport, sinon par défaut on met 180
+let sportGoal = parseInt(localStorage.getItem('saveSportGoal')) || 180;
+const waterGoal = 2.0;
+let proteinGoal = parseInt(localStorage.getItem('saveProteinGoal')) || 100; // Default 100g
+let carbsGoal = parseInt(localStorage.getItem('saveCarbsGoal')) || 200; // Default 200g
+let fatGoal = parseInt(localStorage.getItem('saveFatGoal')) || 60; // Default 60g
+
+// Calorie constants
+const PROTEIN_CAL_PER_GRAM = 4;
+const CARB_CAL_PER_GRAM = 4;
+const FAT_CAL_PER_GRAM = 9;
+
+// Historique du sport (Initialisation manquante)
+let sportHistory = JSON.parse(localStorage.getItem('sportHistory')) || [];
+let sportChart; // Variable pour stocker l'instance du graphique
+let weightHistory = JSON.parse(localStorage.getItem('weightHistory')) || [];
+
+function rafraichirAffichage() {
+    // On met à jour la valeur affichée dans la case "Objectif"
+    document.getElementById('sport-goal-input').value = sportGoal;
+
+    // Update Sport
+    document.getElementById('current-sport').innerText = totalSport;
+    updateProgressBar('sport-bar', (totalSport / sportGoal) * 100);
+
+    // Update Eau (pas de changement ici)
+    document.getElementById('water-count').innerText = totalWater.toFixed(2);
+    updateProgressBar('water-bar', (totalWater / waterGoal) * 100);
+
+    // On met à jour les valeurs affichées dans les cases "Objectif" pour la nutrition
+    document.getElementById('protein-goal-input').value = proteinGoal;
+    document.getElementById('carbs-goal-input').value = carbsGoal;
+    document.getElementById('fat-goal-input').value = fatGoal;
+
+    // Calculate total calories
+    const totalCalories = (totalProtein * PROTEIN_CAL_PER_GRAM) +
+                          (totalCarbs * CARB_CAL_PER_GRAM) +
+                          (totalFat * FAT_CAL_PER_GRAM);
+    document.getElementById('total-calories').innerText = Math.round(totalCalories);
+
+    // Update Protein
+    document.getElementById('current-protein').innerText = totalProtein.toFixed(1);
+    updateProgressBar('protein-bar', (totalProtein / proteinGoal) * 100);
+
+    // Update Carbs
+    document.getElementById('current-carbs').innerText = totalCarbs.toFixed(1);
+    updateProgressBar('carbs-bar', (totalCarbs / carbsGoal) * 100);
+
+    // Update Fat
+    document.getElementById('current-fat').innerText = totalFat.toFixed(1);
+    updateProgressBar('fat-bar', (totalFat / fatGoal) * 100);
+
+    // Update Weight
+    document.getElementById('weight-goal-input').value = weightGoal;
+    document.getElementById('current-weight').innerText = currentWeight.toFixed(1);
+    // La barre de progression pour le poids calcule le progrès entre le poids de départ et l'objectif.
+    // Plus l'écart est faible, plus la barre est proche de 100%.
+
+    let weightPct = 0;
+    // Assure-toi qu'il y a un historique de poids et un objectif valide
+    if (weightHistory.length > 0 && weightGoal > 0) {
+        const startWeight = weightHistory[0].weight; // Le premier poids enregistré est le point de départ
+
+        // Calcul de l'écart total entre le poids de départ et l'objectif
+        const initialGap = Math.abs(startWeight - weightGoal);
+        // Calcul de l'écart restant entre le poids actuel et l'objectif
+        const currentGap = Math.abs(currentWeight - weightGoal);
+
+        if (initialGap === 0) { // Si le poids de départ était déjà l'objectif
+            weightPct = 100; // L'objectif est atteint à 100%
+        } else {
+            // Le progrès est le pourcentage de l'écart initial qui a été réduit
+            weightPct = ((initialGap - currentGap) / initialGap) * 100;
+            // S'assurer que le pourcentage reste entre 0 et 100
+            weightPct = Math.min(100, Math.max(0, weightPct));
+        }
+    } else if (currentWeight > 0 && weightGoal > 0 && currentWeight === weightGoal) {
+        // Cas spécial : pas d'historique, mais le poids actuel est déjà l'objectif
+        weightPct = 100;
+    }
+
+    updateProgressBar('weight-bar', weightPct);
+
+    // Update sport history display
+    updateSportHistoryDisplay();
+
+    // Update Chart
+    updateChart();
+    updateWeightChart();
+}
+
+// Nouvelle fonction utilitaire pour mettre à jour les barres avec animation
+function updateProgressBar(id, pct) {
+    const bar = document.getElementById(id);
+    if (!bar) return;
+    
+    const wasCompleted = bar.classList.contains('is-completed');
+    const displayPct = Math.min(Math.max(0, pct), 100);
+
+    bar.style.width = displayPct + "%";
+    bar.innerText = Math.round(pct) + "%";
+
+    if (pct >= 100 && !wasCompleted) {
+        // Force le redémarrage de l'animation
+        bar.classList.remove('animate-explosion');
+        void bar.offsetWidth; 
+        // Déclenche l'explosion
+        bar.classList.add('animate-explosion');
+        bar.classList.add('is-completed');
+        // On retire la classe d'animation après 600ms pour pouvoir la rejouer plus tard
+        setTimeout(() => bar.classList.remove('animate-explosion'), 600);
+    } else if (pct < 100) {
+        bar.classList.remove('is-completed');
+    }
+}
+
+// Fonction pour initialiser ou mettre à jour le graphique
+function updateChart() {
+    const ctx = document.getElementById('sportChart').getContext('2d');
+    
+    // Préparation des données : 12 mois
+    const monthlyData = new Array(12).fill(0);
+    const currentYear = new Date().getFullYear();
+
+    sportHistory.forEach(item => {
+        const dateEntry = new Date(item.date);
+        if (dateEntry.getFullYear() === currentYear) {
+            // Conversion des minutes en heures pour le graphique
+            monthlyData[dateEntry.getMonth()] += (item.time / 60);
+        }
+    });
+
+    const labels = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+
+    if (sportChart) {
+        sportChart.data.labels = labels;
+        sportChart.data.datasets[0].data = monthlyData;
+        sportChart.update();
+    } else {
+        sportChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Heures de sport',
+                    data: monthlyData,
+                    backgroundColor: '#ff51fc33', // Rose chair pastèque transparent
+                    borderColor: '#29e79b',       // Vert peau pastèque
+                    borderWidth: 2,
+                    borderRadius: 5,
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: { 
+                        beginAtZero: true,
+                        grid: { color: '#eee' }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: {
+                            autoSkip: false
+                        }
+                    }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    }
+}
+
+// Variable pour stocker l'instance du graphique de poids
+let weightChartInstance;
+
+// Fonction pour initialiser ou mettre à jour le graphique de poids
+function updateWeightChart() {
+    const canvas = document.getElementById('weightChart');
+    if (!canvas) return; // Sécurité : on arrête si le canvas n'existe pas encore
+
+    const ctx = canvas.getContext('2d');
+
+    const labels = weightHistory.map(entry => new Date(entry.date).toLocaleDateString());
+    const data = weightHistory.map(entry => entry.weight);
+
+    if (weightChartInstance) {
+        weightChartInstance.data.labels = labels;
+        weightChartInstance.data.datasets[0].data = data;
+        weightChartInstance.update();
+    } else {
+        weightChartInstance = new Chart(ctx, {
+            type: 'line', // Graphique linéaire pour l'évolution du poids
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Poids (kg)',
+                    data: data,
+                    borderColor: '#8e44ad', // Couleur violette pour le poids
+                    backgroundColor: 'rgba(142, 68, 173, 0.2)', // Fond transparent
+                    tension: 0.4, // Courbe douce
+                    fill: true,
+                    pointBackgroundColor: '#8e44ad',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: '#8e44ad',
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: false, // Le poids ne commence pas à zéro
+                        grid: { color: '#eee' }
+                    },
+                    x: {
+                        grid: { display: false }
+                    }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    }
+}
+
+function updateSportHistoryDisplay() {
+    const historyList = document.getElementById('sport-history');
+    historyList.innerHTML = ''; // Clear existing list
+    sportHistory.forEach((item, index) => {
+        const li = document.createElement('li');
+        li.style.display = 'flex';
+        li.style.justifyContent = 'space-between';
+        li.style.alignItems = 'center';
+        li.style.padding = '3px 0';
+        li.style.borderBottom = '1px solid #eee';
+
+        const textNode = document.createElement('span');
+        textNode.textContent = `${item.time} min de ${item.type} (${new Date(item.date).toLocaleDateString()})`;
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = '✕';
+        deleteBtn.className = 'btn-red';
+        deleteBtn.style.padding = '2px 6px';
+        deleteBtn.style.fontSize = '10px';
+        deleteBtn.style.minWidth = '25px';
+        deleteBtn.style.margin = '0';
+        deleteBtn.onclick = () => deleteSportEntry(index);
+
+        li.appendChild(textNode);
+        li.appendChild(deleteBtn);
+        historyList.appendChild(li);
+    });
+}
+
+function deleteSportEntry(index) {
+    // Ajout d'une confirmation pour éviter les erreurs sur petit écran
+    if (!confirm("Voulez-vous vraiment supprimer cette séance ?")) return;
+
+    const deletedTime = sportHistory[index].time;
+    sportHistory.splice(index, 1);
+    
+    // Mise à jour du total cumulé (on déduit le temps supprimé)
+    totalSport = Math.max(0, totalSport - deletedTime);
+    
+    localStorage.setItem('sportHistory', JSON.stringify(sportHistory));
+    localStorage.setItem('saveSport', totalSport);
+    
+    rafraichirAffichage();
+}
+
+// Fonction pour ajouter une activité sportive
+function addSport() {
+    const sportInput = document.getElementById('sport-input');
+    const sportTypeInput = document.getElementById('sport-type');
+
+    const time = parseInt(sportInput.value);
+    const type = sportTypeInput.value.trim();
+
+    if (time > 0 && type !== '') {
+        totalSport += time;
+        localStorage.setItem('saveSport', totalSport);
+
+        const newEntry = { time: time, type: type, date: new Date().toISOString() };
+        sportHistory.push(newEntry);
+        localStorage.setItem('sportHistory', JSON.stringify(sportHistory));
+
+        sportInput.value = '';
+        sportTypeInput.value = '';
+        rafraichirAffichage();
+    }
+}
+
+// Fonction pour réinitialiser l'activité sportive
+function resetSport() {
+    totalSport = 0;
+    localStorage.setItem('saveSport', totalSport);
+    rafraichirAffichage();
+}
+
+// Nouvelle fonction pour changer l'objectif
+function updateSportGoal() {
+    let newGoal = document.getElementById('sport-goal-input').value;
+    if (newGoal > 0) {
+        sportGoal = parseInt(newGoal);
+        localStorage.setItem('saveSportGoal', sportGoal); // On sauvegarde le nouvel objectif
+        rafraichirAffichage(); // On recalcule la barre immédiatement
+    }
+}
+
+// Fonctions pour la section Hydratation
+function addWater(amount) {
+    totalWater += amount;
+    localStorage.setItem('saveWater', totalWater);
+    rafraichirAffichage();
+}
+
+function resetWater() {
+    totalWater = 0;
+    localStorage.removeItem('saveWater');
+    rafraichirAffichage();
+}
+
+// Fonctions pour la section Nutritions
+function addNutrition() {
+    const proteinInput = document.getElementById('add-protein');
+    const carbsInput = document.getElementById('add-carbs');
+    const fatInput = document.getElementById('add-fat');
+
+    const addedProtein = parseFloat(proteinInput.value) || 0;
+    const addedCarbs = parseFloat(carbsInput.value) || 0;
+    const addedFat = parseFloat(fatInput.value) || 0;
+
+    if (addedProtein > 0 || addedCarbs > 0 || addedFat > 0) {
+        totalProtein += addedProtein;
+        totalCarbs += addedCarbs;
+        totalFat += addedFat;
+
+        localStorage.setItem('saveProtein', totalProtein);
+        localStorage.setItem('saveCarbs', totalCarbs);
+        localStorage.setItem('saveFat', totalFat);
+
+        proteinInput.value = '';
+        carbsInput.value = '';
+        fatInput.value = '';
+        rafraichirAffichage();
+    }
+}
+
+function updateNutritionGoals() {
+    let newProteinGoal = parseInt(document.getElementById('protein-goal-input').value);
+    let newCarbsGoal = parseInt(document.getElementById('carbs-goal-input').value);
+    let newFatGoal = parseInt(document.getElementById('fat-goal-input').value);
+
+    if (newProteinGoal > 0) { proteinGoal = newProteinGoal; localStorage.setItem('saveProteinGoal', proteinGoal); }
+    if (newCarbsGoal > 0) { carbsGoal = newCarbsGoal; localStorage.setItem('saveCarbsGoal', carbsGoal); }
+    if (newFatGoal > 0) { fatGoal = newFatGoal; localStorage.setItem('saveFatGoal', fatGoal); }
+    rafraichirAffichage();
+}
+
+function resetNutrition() {
+    totalProtein = 0;
+    totalCarbs = 0;
+    totalFat = 0;
+    localStorage.removeItem('saveProtein');
+    localStorage.removeItem('saveCarbs');
+    localStorage.removeItem('saveFat');
+    rafraichirAffichage();
+}
+
+
+// Fonctions pour la section Poids
+function addWeight() {
+    const weightInput = document.getElementById('add-weight');
+    const newWeight = parseFloat(weightInput.value);
+
+    if (newWeight > 0) {
+        currentWeight = newWeight;
+        localStorage.setItem('saveWeight', currentWeight);
+
+        const newEntry = { date: new Date().toISOString(), weight: newWeight };
+        weightHistory.push(newEntry);
+        localStorage.setItem('weightHistory', JSON.stringify(weightHistory));
+
+        weightInput.value = '';
+        rafraichirAffichage();
+    }
+}
+
+function updateWeightGoal() {
+    let newGoal = parseFloat(document.getElementById('weight-goal-input').value);
+    if (newGoal > 0) {
+        weightGoal = newGoal;
+        localStorage.setItem('saveWeightGoal', weightGoal);
+        rafraichirAffichage();
+    }
+}
+
+function resetWeight() {
+    currentWeight = 0;
+    weightGoal = 60; // Remise à zéro vers l'objectif par défaut
+    weightHistory = [];
+    localStorage.removeItem('saveWeight');
+    localStorage.removeItem('saveWeightGoal');
+    localStorage.removeItem('weightHistory');
+    rafraichirAffichage();
+}
+
+rafraichirAffichage();
+    </script>
+
+</body>
+</html>
