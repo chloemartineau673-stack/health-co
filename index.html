@@ -6,7 +6,7 @@
     <!-- Balises pour l'installation sur téléphone (Mode App) -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#f4f7f6">
+    <meta name="theme-color" content="#0f0f0f">
 
     <title>Mon Dashboard Personnel</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -26,7 +26,8 @@
 
         body {
             font-family: 'Segoe UI', sans-serif;
-            background-color: #f4f7f6; /* Garde un fond clair pour l'instant */
+            background-color: #0f0f0f; /* Gris foncé presque noir */
+            color: #e0e0e0;
             padding: 20px;
         }
         .dashboard { 
@@ -37,8 +38,8 @@
             margin: auto; 
         }
         .full-width { grid-column: 1 / -1; } /* Pour que le graphique prenne toute la largeur */
-        section { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        h2 { color: #2c3e50; margin-top: 0; }
+        section { background: #1a1a1a; padding: 20px; border-radius: 12px; box-shadow: 0 10px 20px rgba(0,0,0,0.5); border: 1px solid #2a2a2a; }
+        h2 { color: #ffffff; margin-top: 0; }
 
         /* --- RESPONSIVE DESIGN --- */
         @media (max-width: 1200px) {
@@ -51,7 +52,7 @@
         }
         
         /* Barres de progression */
-        .progress-container { background: #eee; border-radius: 20px; height: 25px; width: 100%; margin: 10px 0; }
+        .progress-container { background: #333; border-radius: 20px; height: 25px; width: 100%; margin: 10px 0; }
         .progress-bar {
             height: 100%;
             border-radius: 20px;
@@ -101,7 +102,7 @@
             box-shadow: 0 0 8px var(--neon-purple), 0 0 15px var(--neon-purple);
         }
         
-        input { padding: 8px; border: 1px solid #ddd; border-radius: 5px; width: 100px; margin-bottom: 5px; }
+        input { padding: 8px; border: 1px solid #444; border-radius: 5px; width: 100px; margin-bottom: 5px; background: #2a2a2a; color: white; }
 
         /* Animation d'explosion néon */
         @keyframes neon-explosion {
@@ -119,7 +120,7 @@
 </head>
 <body>
 
-    <h1 style="text-align: center;">🍉 Health&Co 🍉</h1>
+    <h1 style="text-align: center; color: white;">🍉 Health&Co 🍉</h1>
 
     <div class="dashboard">
         
@@ -396,7 +397,7 @@ function updateChart() {
                 scales: {
                     y: { 
                         beginAtZero: true,
-                        grid: { color: '#eee' }
+                        grid: { color: '#333' }
                     },
                     x: {
                         grid: { display: false },
@@ -453,7 +454,7 @@ function updateWeightChart() {
                 scales: {
                     y: {
                         beginAtZero: false, // Le poids ne commence pas à zéro
-                        grid: { color: '#eee' }
+                        grid: { color: '#333' }
                     },
                     x: {
                         grid: { display: false }
@@ -476,7 +477,7 @@ function updateSportHistoryDisplay() {
         li.style.justifyContent = 'space-between';
         li.style.alignItems = 'center';
         li.style.padding = '3px 0';
-        li.style.borderBottom = '1px solid #eee';
+        li.style.borderBottom = '1px solid #333';
 
         const textNode = document.createElement('span');
         textNode.textContent = `${item.time} min de ${item.type} (${new Date(item.date).toLocaleDateString()})`;
