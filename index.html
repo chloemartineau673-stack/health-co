@@ -342,6 +342,12 @@
             <div style="margin-bottom: 10px;">
                 <button onclick="toggleScanner()" id="scan-btn">📷 Scanner un produit</button>
             </div>
+            
+            <div id="quantity-section" style="display: none; margin-bottom: 15px; padding: 10px; border: 1px dashed var(--neon-green); border-radius: 8px;">
+                <label style="font-size: 0.9em; display: block; margin-bottom: 5px;">Quantité consommée (g) :</label>
+                <input type="number" id="product-quantity" value="100" oninput="recalculateMacros()" style="width: 100%; box-sizing: border-box;">
+            </div>
+
             <input type="number" id="add-protein" placeholder="Prot. (g)" style="width: 80px;">
             <input type="number" id="add-carbs" placeholder="Gluc. (g)" style="width: 80px;">
             <input type="number" id="add-fat" placeholder="Lip. (g)" style="width: 80px;">
@@ -754,6 +760,8 @@
                 proteinInput.value = '';
                 carbsInput.value = '';
                 fatInput.value = '';
+                document.getElementById('quantity-section').style.display = 'none';
+                document.getElementById('product-info').innerText = '';
                 rafraichirAffichage();
             }
         }
@@ -840,6 +848,16 @@
             fetchProductData(decodedText);
         }
 
+        // Stockage temporaire des macros pour 100g
+        let lastScannedMacros = { p: 0, c: 0, f: 0 };
+
+        function recalculateMacros() {
+            const qty = parseFloat(document.getElementById('product-quantity').value) || 0;
+            document.getElementById('add-protein').value = ((lastScannedMacros.p * qty) / 100).toFixed(1);
+            document.getElementById('add-carbs').value = ((lastScannedMacros.c * qty) / 100).toFixed(1);
+            document.getElementById('add-fat').value = ((lastScannedMacros.f * qty) / 100).toFixed(1);
+        }
+
         async function fetchProductData(barcode) {
             const infoDisplay = document.getElementById('product-info');
             infoDisplay.innerText = "Recherche du produit...";
@@ -850,14 +868,16 @@
 
                 if (data.status === 1) {
                     const product = data.product;
-                    const p = product.nutriments.proteins_100g || 0;
-                    const c = product.nutriments.carbohydrates_100g || 0;
-                    const f = product.nutriments.fat_100g || 0;
+                    lastScannedMacros = {
+                        p: product.nutriments.proteins_100g || 0,
+                        c: product.nutriments.carbohydrates_100g || 0,
+                        f: product.nutriments.fat_100g || 0
+                    };
 
-                    document.getElementById('add-protein').value = p;
-                    document.getElementById('add-carbs').value = c;
-                    document.getElementById('add-fat').value = f;
-                    infoDisplay.innerText = `Produit trouvé : ${product.product_name || 'Inconnu'} (Valeurs pour 100g)`;
+                    document.getElementById('quantity-section').style.display = 'block';
+                    document.getElementById('product-quantity').value = 100;
+                    recalculateMacros();
+                    infoDisplay.innerText = `Produit trouvé : ${product.product_name || 'Inconnu'}`;
                 } else {
                     infoDisplay.innerText = "Produit non trouvé.";
                 }
