@@ -9,6 +9,7 @@
 
     <title>Mon Dashboard Personnel</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         /* --- DESIGN (CSS) --- */
         :root {
@@ -183,11 +184,29 @@
                     <option value="femme">Femme</option>
                 </select>
 
+                <label>Activité :</label>
+                <select id="user-activity" onchange="updateProfile()" style="padding: 8px; border-radius: 5px; background: #2a2a2a; color: white;">
+                    <option value="1.2">Faible (0-2h/sem)</option>
+                    <option value="1.375">Modérée (2-5h/sem)</option>
+                    <option value="1.55">Intense (5-10h/sem)</option>
+                    <option value="1.725">Expert (10h+/sem)</option>
+                </select>
+
+                <label>Objectif :</label>
+                <select id="user-goal" onchange="updateProfile()" style="padding: 8px; border-radius: 5px; background: #2a2a2a; color: white;">
+                    <option value="perte">Perte de poids</option>
+                    <option value="muscle">Prise de muscle</option>
+                    <option value="mixte">Les deux (Mixte)</option>
+                </select>
+
                 <label>Objectif Poids :</label>
                 <input type="number" id="weight-goal-input" placeholder="kg" onchange="updateWeightGoal()">
             </div>
             
-            <p style="margin-top: 15px; font-size: 0.9em; opacity: 0.8; text-align: center;">BMR (Besoin au repos) : <span id="bmr-display">0</span> kcal</p>
+            <p style="margin-top: 15px; font-size: 0.85em; opacity: 0.8; text-align: center;">
+                BMR: <span id="bmr-display">0</span> | TDEE: <span id="tdee-display">0</span> | 
+                Cible: <span id="target-display" style="color: var(--neon-green); font-weight: bold;">0</span> kcal
+            </p>
 
             <hr style="margin: 15px 0; border: 0; border-top: 1px solid #333;">
 
@@ -272,9 +291,9 @@
             <h2>🥗 Nutrition</h2>
             <p>Objectifs journaliers :</p>
             <div style="display: flex; justify-content: space-around; margin-bottom: 15px;">
-                <div>Prot. : <input type="number" id="protein-goal-input" style="width: 50px;" onchange="updateNutritionGoals()"> g</div>
-                <div>Gluc. : <input type="number" id="carbs-goal-input" style="width: 50px;" onchange="updateNutritionGoals()"> g</div>
-                <div>Lip. : <input type="number" id="fat-goal-input" style="width: 50px;" onchange="updateNutritionGoals()"> g</div>
+                <div>Prot. : <input type="number" id="protein-goal-input" style="width: 50px;" readonly> g</div>
+                <div>Gluc. : <input type="number" id="carbs-goal-input" style="width: 50px;" readonly> g</div>
+                <div>Lip. : <input type="number" id="fat-goal-input" style="width: 50px;" readonly> g</div>
             </div>
 
             <h3>Macros du jour :</h3>
@@ -319,11 +338,18 @@
 
             <hr style="margin: 20px 0;">
             <p>Ajouter un repas:</p>
+            <div id="reader" style="width: 100%; max-width: 400px; margin: 10px auto; display: none; border: 2px solid var(--neon-green); border-radius: 8px;"></div>
+            <div style="margin-bottom: 10px;">
+                <button onclick="toggleScanner()" id="scan-btn">📷 Scanner un produit</button>
+            </div>
             <input type="number" id="add-protein" placeholder="Prot. (g)" style="width: 80px;">
             <input type="number" id="add-carbs" placeholder="Gluc. (g)" style="width: 80px;">
             <input type="number" id="add-fat" placeholder="Lip. (g)" style="width: 80px;">
-            <button onclick="addNutrition()">Ajouter</button>
-            <button class="btn-red" onclick="resetNutrition()">Reset jour</button>
+            <div style="margin-top: 10px;">
+                <button onclick="addNutrition()">Ajouter</button>
+                <button class="btn-red" onclick="resetNutrition()">Reset jour</button>
+            </div>
+            <p id="product-info" style="font-size: 0.8em; color: var(--neon-green); margin-top: 5px;"></p>
         </section>
 
         <!-- GRAPHIQUE ANNUEL -->
@@ -349,6 +375,8 @@
         let userAge = parseInt(localStorage.getItem('userAge')) || 30;
         let userHeight = parseInt(localStorage.getItem('userHeight')) || 170;
         let userGender = localStorage.getItem('userGender') || 'homme';
+        let userActivity = parseFloat(localStorage.getItem('userActivity')) || 1.2;
+        let userGoal = localStorage.getItem('userGoal') || 'perte';
 
         let sportGoal = parseInt(localStorage.getItem('saveSportGoal')) || 180;
         const waterGoal = 2.0;
@@ -378,9 +406,13 @@
             userAge = parseInt(document.getElementById('user-age').value);
             userHeight = parseInt(document.getElementById('user-height').value);
             userGender = document.getElementById('user-gender').value;
+            userActivity = parseFloat(document.getElementById('user-activity').value);
+            userGoal = document.getElementById('user-goal').value;
             localStorage.setItem('userAge', userAge);
             localStorage.setItem('userHeight', userHeight);
             localStorage.setItem('userGender', userGender);
+            localStorage.setItem('userActivity', userActivity);
+            localStorage.setItem('userGoal', userGoal);
             rafraichirAffichage();
         }
 
@@ -400,6 +432,15 @@
             document.getElementById('user-age').value = userAge;
             document.getElementById('user-height').value = userHeight;
             document.getElementById('user-gender').value = userGender;
+            document.getElementById('user-activity').value = userActivity;
+            document.getElementById('user-goal').value = userGoal;
+
+            // Calcul automatique des objectifs : Prot (x2), Gluc (x3), Lip (x0.8)
+            if (currentWeight > 0) {
+                proteinGoal = Math.round(currentWeight * 2);
+                carbsGoal = Math.round(currentWeight * 3);
+                fatGoal = Math.round(currentWeight * 0.8);
+            }
 
             document.getElementById('sport-goal-input').value = sportGoal;
             document.getElementById('current-sport').innerText = totalSport;
@@ -418,8 +459,31 @@
                                   (totalFat * FAT_CAL_PER_GRAM);
 
             const bmr = calculateBMR();
+            const tdee = Math.round(bmr * userActivity);
+            
+            // Calcul de l'ajustement selon l'objectif et l'activité
+            let adjustment = 0;
+            if (userGoal === 'perte') {
+                if (userActivity <= 1.2) adjustment = -350;
+                else if (userActivity <= 1.375) adjustment = -450;
+                else adjustment = -600; 
+            } else if (userGoal === 'muscle') {
+                if (userActivity <= 1.2) adjustment = 0;
+                else if (userActivity <= 1.375) adjustment = 200;
+                else if (userActivity <= 1.55) adjustment = 250;
+                else adjustment = 300;
+            } else {
+                adjustment = 0; // Mixte / Maintenance
+            }
+
+            const targetCalories = tdee + adjustment;
+            
             document.getElementById('bmr-display').innerText = bmr;
-            const dailyNeed = bmr + totalBurnedCalories;
+            document.getElementById('tdee-display').innerText = tdee;
+            document.getElementById('target-display').innerText = targetCalories;
+            
+            // Besoin journalier = Cible (TDEE + Ajustement) + Sport réel saisi
+            const dailyNeed = targetCalories + totalBurnedCalories;
             const remaining = dailyNeed - totalCalories;
 
             document.getElementById('total-calories').innerText = Math.round(totalCalories);
@@ -695,12 +759,8 @@
         }
 
         function updateNutritionGoals() {
-            let newProteinGoal = parseInt(document.getElementById('protein-goal-input').value);
             let newCarbsGoal = parseInt(document.getElementById('carbs-goal-input').value);
-            let newFatGoal = parseInt(document.getElementById('fat-goal-input').value);
-            if (newProteinGoal > 0) { proteinGoal = newProteinGoal; localStorage.setItem('saveProteinGoal', proteinGoal); }
             if (newCarbsGoal > 0) { carbsGoal = newCarbsGoal; localStorage.setItem('saveCarbsGoal', carbsGoal); }
-            if (newFatGoal > 0) { fatGoal = newFatGoal; localStorage.setItem('saveFatGoal', fatGoal); }
             rafraichirAffichage();
         }
 
@@ -743,6 +803,67 @@
             localStorage.removeItem('saveWeightGoal');
             localStorage.removeItem('weightHistory');
             rafraichirAffichage();
+        }
+
+        // --- SCANNER ET API OPENFOODFACTS ---
+        let html5QrCode;
+        function toggleScanner() {
+            const readerDiv = document.getElementById('reader');
+            const scanBtn = document.getElementById('scan-btn');
+
+            if (readerDiv.style.display === 'none') {
+                readerDiv.style.display = 'block';
+                scanBtn.innerText = "⏹ Arrêter le scan";
+                startScanner();
+            } else {
+                stopScanner();
+            }
+        }
+
+        function startScanner() {
+            html5QrCode = new Html5Qrcode("reader");
+            const config = { fps: 10, qrbox: { width: 250, height: 150 } };
+            html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess);
+        }
+
+        function stopScanner() {
+            if (html5QrCode) {
+                html5QrCode.stop().then(() => {
+                    document.getElementById('reader').style.display = 'none';
+                    document.getElementById('scan-btn').innerText = "📷 Scanner un produit";
+                });
+            }
+        }
+
+        function onScanSuccess(decodedText) {
+            stopScanner();
+            fetchProductData(decodedText);
+        }
+
+        async function fetchProductData(barcode) {
+            const infoDisplay = document.getElementById('product-info');
+            infoDisplay.innerText = "Recherche du produit...";
+            
+            try {
+                const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+                const data = await response.json();
+
+                if (data.status === 1) {
+                    const product = data.product;
+                    const p = product.nutriments.proteins_100g || 0;
+                    const c = product.nutriments.carbohydrates_100g || 0;
+                    const f = product.nutriments.fat_100g || 0;
+
+                    document.getElementById('add-protein').value = p;
+                    document.getElementById('add-carbs').value = c;
+                    document.getElementById('add-fat').value = f;
+                    infoDisplay.innerText = `Produit trouvé : ${product.product_name || 'Inconnu'} (Valeurs pour 100g)`;
+                } else {
+                    infoDisplay.innerText = "Produit non trouvé.";
+                }
+            } catch (error) {
+                infoDisplay.innerText = "Erreur lors de la recherche.";
+            }
         }
 
         rafraichirAffichage();
