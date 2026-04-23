@@ -1,30 +1,1007 @@
-# État du Projet - Health&Co
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0f0f0f">
 
-## ✅ Fait
-- Structure de base HTML/CSS (Style Néon/Pastèque).
-- Compteurs de sport, eau, nutrition et poids.
-- Graphiques Chart.js pour le sport et le poids.
-- Persistance locale avec localStorage.
-- Calcul du Métabolisme de Base (BMR) intégré.
-- [✅] Affichage des calories brûlées par séance dans l'historique.
-- [✅] Correction du bug de recalcul des calories (brûlées/restantes) lors de la suppression.
-- [✅] Ajout d'un bouton de réinitialisation pour les calories sportives.
-- [✅] Fusion de la section "Poids" dans la section "Profil".
-- [✅] Historique nutritionnel avec possibilité de supprimer des aliments.
-- [✅] Calcul automatique de l'objectif protéines (Poids x 2).
-- [✅] Calcul automatique de l'objectif lipides (Poids x 0.8).
-- [✅] Calcul automatique de l'objectif glucides (Poids x 3).
-- [✅] Ajout des habitudes d'activité sportives dans le profil et calcul du TDEE.
-- [✅] Ajout de l'objectif personnel (Perte, Muscle, Mixte) dans le profil.
-- [✅] Calcul automatique de la cible calorique (Ajustement selon objectif/activité).
+    <title>Mon Dashboard Personnel</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        /* --- DESIGN (CSS) --- */
+        :root {
+            --neon-green: #60d94b;
+            --neon-blue: #00FFFF;
+            --neon-orange: #f583ed;
+            --neon-yellow: #c81ad8;
+            --neon-magenta: #0ff;
+            --neon-weight: #8e44ad;
+            --neon-purple: var(--neon-green);
+            --neon-default-button: #d5588a;
+        }
 
-## ⏳ À faire / Prochaines étapes
-- [ ] **Nutrition Avancée**
-    - [⏳] Ajustement dynamique des macros selon l'activité du jour.
-    - [✅] Intégration d'un scanner de code-barres (API OpenFoodFacts).
-    - [✅] Système de "Calories restantes" (Objectif + Sport - Alimentation).
-- [ ] Ajouter une fonction d'exportation des données (CSV).
-- [✅] Gérer la réinitialisation automatique chaque jour (Archivage + Reset UI).
-- [ ] Améliorer le design du graphique de poids.
-- [ ] Explorer la synchronisation des données entre téléphone et PC.
-- [ ] Gérer plusieurs profils utilisateurs avec sécurisation par mot de passe ou code.
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #0f0f0f;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+        .dashboard { 
+            display: grid; 
+            grid-template-columns: repeat(4, 1fr); 
+            gap: 20px; 
+            max-width: 1600px; 
+            margin: auto; 
+        }
+        .full-width { grid-column: 1 / -1; }
+        section { background: #1a1a1a; padding: 20px; border-radius: 12px; box-shadow: 0 10px 20px rgba(0,0,0,0.5); border: 1px solid #2a2a2a; }
+        h2 { color: #ffffff; margin-top: 0; }
+
+        /* --- RESPONSIVE --- */
+        @media (max-width: 1200px) {
+            .dashboard { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 600px) {
+            .dashboard { grid-template-columns: 1fr; }
+            body { padding: 10px; }
+        }
+
+        /* === ROUES DE PROGRESSION (SVG) === */
+        .wheel-wrapper {
+            position: relative;
+            width: 130px;
+            height: 130px;
+            margin: 10px auto;
+        }
+        .wheel-wrapper.small {
+            width: 95px;
+            height: 95px;
+        }
+        .progress-wheel {
+            width: 100%;
+            height: 100%;
+            transform: rotate(-90deg);
+        }
+        .wheel-track {
+            fill: none;
+            stroke: #333;
+            stroke-width: 9;
+        }
+        .wheel-fill {
+            fill: none;
+            stroke-width: 9;
+            stroke-linecap: round;
+            stroke-dasharray: 263.89;
+            stroke-dashoffset: 263.89;
+            transition: stroke-dashoffset 0.5s ease, filter 0.3s;
+        }
+        .wheel-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 15px;
+            font-weight: bold;
+            color: white;
+            pointer-events: none;
+        }
+        .wheel-wrapper.small .wheel-text {
+            font-size: 11px;
+        }
+
+        /* Couleurs des roues */
+        .bg-sport   { stroke: var(--neon-green);   --bar-glow: var(--neon-green);   filter: drop-shadow(0 0 5px var(--neon-green)); }
+        .bg-water   { stroke: var(--neon-blue);    --bar-glow: var(--neon-blue);    filter: drop-shadow(0 0 5px var(--neon-blue)); }
+        .bg-protein { stroke: var(--neon-orange);  --bar-glow: var(--neon-orange);  filter: drop-shadow(0 0 5px var(--neon-orange)); }
+        .bg-carbs   { stroke: var(--neon-yellow);  --bar-glow: var(--neon-yellow);  filter: drop-shadow(0 0 5px var(--neon-yellow)); }
+        .bg-fat     { stroke: var(--neon-magenta); --bar-glow: var(--neon-magenta); filter: drop-shadow(0 0 5px var(--neon-magenta)); }
+        .bg-weight  { stroke: var(--neon-weight);  --bar-glow: var(--neon-weight);  filter: drop-shadow(0 0 5px var(--neon-weight)); }
+
+        /* Animation d'explosion néon adaptée SVG */
+        @keyframes neon-explosion {
+            0%   { filter: drop-shadow(0 0 5px var(--bar-glow)); }
+            40%  { filter: drop-shadow(0 0 18px white) drop-shadow(0 0 35px var(--bar-glow)) brightness(2); }
+            100% { filter: drop-shadow(0 0 5px var(--bar-glow)); }
+        }
+        .animate-explosion {
+            animation: neon-explosion 0.6s ease-in-out;
+        }
+
+        /* Bloc nutrition : 3 roues côte à côte */
+        .wheels-row {
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-start;
+            margin: 10px 0;
+        }
+        .wheel-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        .wheel-item .wheel-label-top {
+            font-size: 0.8em;
+            color: #aaa;
+            margin-bottom: 2px;
+        }
+        .wheel-item .wheel-sublabel {
+            font-size: 0.85em;
+            color: #ccc;
+            margin-top: 2px;
+        }
+
+        /* Boutons */
+        button {
+            background: var(--neon-default-button);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 2px;
+            transition: background 0.3s, box-shadow 0.3s;
+            box-shadow: 0 0 5px var(--neon-default-button), 0 0 10px var(--neon-default-button);
+        }
+        button:hover {
+            opacity: 0.9;
+            box-shadow: 0 0 8px var(--neon-default-button), 0 0 15px var(--neon-default-button);
+        }
+        .btn-red {
+            background-color: var(--neon-purple);
+            box-shadow: 0 0 5px var(--neon-purple), 0 0 10px var(--neon-purple);
+        }
+        .btn-red:hover {
+            opacity: 0.9;
+            box-shadow: 0 0 8px var(--neon-purple), 0 0 15px var(--neon-purple);
+        }
+
+        input { padding: 8px; border: 1px solid #444; border-radius: 5px; width: 100px; margin-bottom: 5px; background: #2a2a2a; color: white; }
+    </style>
+</head>
+<body>
+
+    <h1 style="text-align: center; color: white;">🍉 Health&Co 🍉</h1>
+
+    <div class="dashboard">
+        
+        <!-- PROFIL -->
+        <section id="profile">
+            <h2>🙋‍♀️ Mon Profil</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center;">
+                <label>Âge :</label>
+                <input type="number" id="user-age" placeholder="ans" onchange="updateProfile()">
+                
+                <label>Taille (cm) :</label>
+                <input type="number" id="user-height" placeholder="cm" onchange="updateProfile()">
+                
+                <label>Sexe :</label>
+                <select id="user-gender" onchange="updateProfile()" style="padding: 8px; border-radius: 5px; background: #2a2a2a; color: white;">
+                    <option value="homme">Homme</option>
+                    <option value="femme">Femme</option>
+                </select>
+
+                <label>Activité :</label>
+                <select id="user-activity" onchange="updateProfile()" style="padding: 8px; border-radius: 5px; background: #2a2a2a; color: white;">
+                    <option value="1.2">Faible (0-2h/sem)</option>
+                    <option value="1.375">Modérée (2-5h/sem)</option>
+                    <option value="1.55">Intense (5-10h/sem)</option>
+                    <option value="1.725">Expert (10h+/sem)</option>
+                </select>
+
+                <label>Objectif :</label>
+                <select id="user-goal" onchange="updateProfile()" style="padding: 8px; border-radius: 5px; background: #2a2a2a; color: white;">
+                    <option value="perte">Perte de poids</option>
+                    <option value="muscle">Prise de muscle</option>
+                    <option value="mixte">Les deux (Mixte)</option>
+                </select>
+
+                <label>Objectif Poids :</label>
+                <input type="number" id="weight-goal-input" placeholder="kg" onchange="updateWeightGoal()">
+            </div>
+            
+            <p style="margin-top: 15px; font-size: 0.85em; opacity: 0.8; text-align: center;">
+                BMR: <span id="bmr-display">0</span> | TDEE: <span id="tdee-display">0</span> | 
+                Cible: <span id="target-display" style="color: var(--neon-green); font-weight: bold;">0</span> kcal
+            </p>
+
+            <hr style="margin: 15px 0; border: 0; border-top: 1px solid #333;">
+
+            <p style="text-align: center;">Poids actuel : <span id="current-weight">0.0</span> kg</p>
+            <div class="wheel-wrapper">
+                <svg class="progress-wheel" viewBox="0 0 100 100">
+                    <circle class="wheel-track" cx="50" cy="50" r="42"/>
+                    <circle class="wheel-fill bg-weight" id="weight-bar" cx="50" cy="50" r="42"/>
+                </svg>
+                <span class="wheel-text" id="weight-bar-text">0%</span>
+            </div>
+
+            <div style="text-align: center; margin-top: 10px;">
+                <input type="number" id="add-weight" placeholder="Nouveau (kg)" style="width: 100px;">
+                <button onclick="addWeight()">Enregistrer</button>
+                <br>
+                <button class="btn-red" style="margin-top: 5px; font-size: 0.8em;" onclick="resetWeight()">Reset Poids</button>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <canvas id="weightChart" height="200"></canvas>
+            </div>
+        </section>
+
+        <!-- SPORT -->
+        <section id="sport">
+            <h2>🏋️ Activité Sportive</h2>
+            <p>Objectif semaine : 
+                <input type="number" id="sport-goal-input" style="width: 60px;" onchange="updateSportGoal()"> min
+            </p>
+
+            <!-- Roue Sport -->
+            <div class="wheel-wrapper">
+                <svg class="progress-wheel" viewBox="0 0 100 100">
+                    <circle class="wheel-track" cx="50" cy="50" r="42"/>
+                    <circle class="wheel-fill bg-sport" id="sport-bar" cx="50" cy="50" r="42"/>
+                </svg>
+                <span class="wheel-text" id="sport-bar-text">0%</span>
+            </div>
+
+            <p style="text-align:center;">Temps cumulé : <span id="current-sport">0</span> min</p>
+            <p style="text-align:center;">Calories brûlées (est.) : <span id="burned-calories">0</span> kcal</p>
+
+            <input type="number" id="sport-input" placeholder="Min">
+            <select id="sport-type" style="padding: 8px; border-radius: 5px; background: #2a2a2a; color: white;">
+                <option value="Running">Course (Running)</option>
+                <option value="Cycling">Vélo (Cycling)</option>
+                <option value="Fitness">Muscu/Fitness</option>
+                <option value="Walking">Marche</option>
+                <option value="Other">Autre</option>
+            </select>
+            <button onclick="addSport()">Ajouter</button>
+            <br><br>
+            <button class="btn-red" onclick="resetSport()">Reset semaine</button>
+            <button class="btn-red" onclick="resetCalories()">Reset Calories</button>
+            <ul id="sport-history" style="font-size: 0.8em; color: #666;"></ul>
+        </section>
+
+        <!-- HYDRATATION -->
+        <section id="water">
+            <h2>💧 Hydratation</h2>
+            <p>Objectif jour : <strong>2 Litres</strong></p>
+
+            <!-- Roue Eau -->
+            <div class="wheel-wrapper">
+                <svg class="progress-wheel" viewBox="0 0 100 100">
+                    <circle class="wheel-track" cx="50" cy="50" r="42"/>
+                    <circle class="wheel-fill bg-water" id="water-bar" cx="50" cy="50" r="42"/>
+                </svg>
+                <span class="wheel-text" id="water-bar-text">0%</span>
+            </div>
+
+            <p style="text-align:center;">Aujourd'hui : <span id="water-count">0</span> L</p>
+            <button onclick="addWater(0.25)">+ 250ml</button>
+            <button onclick="addWater(0.5)">+ 500ml</button>
+            <br><br>
+            <button class="btn-red" onclick="resetWater()">Vider (Reset jour)</button>
+        </section>
+
+        <!-- NUTRITION -->
+        <section id="nutrition">
+            <h2>🥗 Nutrition</h2>
+            <p>Objectifs journaliers :</p>
+            <div style="display: flex; justify-content: space-around; margin-bottom: 15px;">
+                <div>Prot. : <input type="number" id="protein-goal-input" style="width: 50px;" readonly> g</div>
+                <div>Gluc. : <input type="number" id="carbs-goal-input" style="width: 50px;" readonly> g</div>
+                <div>Lip. : <input type="number" id="fat-goal-input" style="width: 50px;" readonly> g</div>
+            </div>
+
+            <h3>Macros du jour :</h3>
+            <p>Consommées: <span id="total-calories">0</span> kcal | Restantes: <span id="remaining-calories">0</span> kcal</p>
+
+            <!-- 3 Roues Nutrition côte à côte -->
+            <div class="wheels-row">
+                <div class="wheel-item">
+                    <div class="wheel-label-top">Protéines</div>
+                    <div class="wheel-wrapper small">
+                        <svg class="progress-wheel" viewBox="0 0 100 100">
+                            <circle class="wheel-track" cx="50" cy="50" r="42"/>
+                            <circle class="wheel-fill bg-protein" id="protein-bar" cx="50" cy="50" r="42"/>
+                        </svg>
+                        <span class="wheel-text" id="protein-bar-text">0%</span>
+                    </div>
+                    <div class="wheel-sublabel"><span id="current-protein">0</span> g</div>
+                </div>
+                <div class="wheel-item">
+                    <div class="wheel-label-top">Glucides</div>
+                    <div class="wheel-wrapper small">
+                        <svg class="progress-wheel" viewBox="0 0 100 100">
+                            <circle class="wheel-track" cx="50" cy="50" r="42"/>
+                            <circle class="wheel-fill bg-carbs" id="carbs-bar" cx="50" cy="50" r="42"/>
+                        </svg>
+                        <span class="wheel-text" id="carbs-bar-text">0%</span>
+                    </div>
+                    <div class="wheel-sublabel"><span id="current-carbs">0</span> g</div>
+                </div>
+                <div class="wheel-item">
+                    <div class="wheel-label-top">Lipides</div>
+                    <div class="wheel-wrapper small">
+                        <svg class="progress-wheel" viewBox="0 0 100 100">
+                            <circle class="wheel-track" cx="50" cy="50" r="42"/>
+                            <circle class="wheel-fill bg-fat" id="fat-bar" cx="50" cy="50" r="42"/>
+                        </svg>
+                        <span class="wheel-text" id="fat-bar-text">0%</span>
+                    </div>
+                    <div class="wheel-sublabel"><span id="current-fat">0</span> g</div>
+                </div>
+            </div>
+
+            <hr style="margin: 20px 0;">
+            <p>Ajouter un repas:</p>
+            <div id="reader" style="width: 100%; max-width: 400px; margin: 10px auto; display: none; border: 2px solid var(--neon-green); border-radius: 8px;"></div>
+            <div style="margin-bottom: 10px;">
+                <button onclick="toggleScanner()" id="scan-btn">📷 Scanner un produit</button>
+            </div>
+            
+            <div id="quantity-section" style="display: none; margin-bottom: 15px; padding: 10px; border: 1px dashed var(--neon-green); border-radius: 8px;">
+                <label style="font-size: 0.9em; display: block; margin-bottom: 5px;">Quantité consommée (g) :</label>
+                <input type="number" id="product-quantity" value="100" oninput="recalculateMacros()" style="width: 100%; box-sizing: border-box;">
+            </div>
+
+            <input type="number" id="add-protein" placeholder="Prot. (g)" style="width: 80px;">
+            <input type="number" id="add-carbs" placeholder="Gluc. (g)" style="width: 80px;">
+            <input type="number" id="add-fat" placeholder="Lip. (g)" style="width: 80px;">
+            <div style="margin-top: 10px;">
+                <button onclick="addNutrition()">Ajouter</button>
+                <button class="btn-red" onclick="resetNutrition()">Reset jour</button>
+            </div>
+            <p id="product-info" style="font-size: 0.8em; color: var(--neon-green); margin-top: 5px;"></p>
+            <ul id="nutrition-history" style="font-size: 0.8em; color: #666; margin-top: 15px; padding-left: 0; list-style: none;"></ul>
+        </section>
+
+        <!-- GRAPHIQUE ANNUEL -->
+        <section id="stats" class="full-width">
+            <h2>📊 Volume Sportif Annuel (h)</h2>
+            <canvas id="sportChart" height="100"></canvas>
+        </section>
+
+    </div>
+
+    <script>
+        // 1. Initialisation
+        let totalSport = parseInt(localStorage.getItem('saveSport')) || 0;
+        let totalBurnedCalories = parseFloat(localStorage.getItem('saveBurnedCalories')) || 0;
+        let totalWater = parseFloat(localStorage.getItem('saveWater')) || 0;
+        let totalProtein = parseFloat(localStorage.getItem('saveProtein')) || 0;
+        let totalCarbs = parseFloat(localStorage.getItem('saveCarbs')) || 0;
+        let totalFat = parseFloat(localStorage.getItem('saveFat')) || 0;
+        let nutritionHistory = JSON.parse(localStorage.getItem('nutritionHistory')) || [];
+        let currentWeight = parseFloat(localStorage.getItem('saveWeight')) || 0;
+        let weightGoal = parseFloat(localStorage.getItem('saveWeightGoal')) || 60;
+
+        // Profil
+        let userAge = parseInt(localStorage.getItem('userAge')) || 30;
+        let userHeight = parseInt(localStorage.getItem('userHeight')) || 170;
+        let userGender = localStorage.getItem('userGender') || 'homme';
+        let userActivity = parseFloat(localStorage.getItem('userActivity')) || 1.2;
+        let userGoal = localStorage.getItem('userGoal') || 'perte';
+
+        let sportGoal = parseInt(localStorage.getItem('saveSportGoal')) || 180;
+        const waterGoal = 2.0;
+        let proteinGoal = parseInt(localStorage.getItem('saveProteinGoal')) || 100;
+        let carbsGoal = parseInt(localStorage.getItem('saveCarbsGoal')) || 200;
+        let fatGoal = parseInt(localStorage.getItem('saveFatGoal')) || 60;
+
+        const PROTEIN_CAL_PER_GRAM = 4;
+        const CARB_CAL_PER_GRAM = 4;
+        const FAT_CAL_PER_GRAM = 9;
+
+        // Circonférence pour r=42 : 2 * π * 42 ≈ 263.89
+        const CIRCUMFERENCE = 2 * Math.PI * 42;
+
+        // --- LOGIQUE DE RÉINITIALISATION QUOTIDIENNE ---
+        function checkDailyReset() {
+            const today = new Date().toLocaleDateString('fr-CA'); // Format YYYY-MM-DD
+            const lastDate = localStorage.getItem('lastResetDate');
+
+            if (lastDate && lastDate !== today) {
+                // C'est un nouveau jour ! On remet les compteurs à zéro
+                totalWater = 0;
+                totalProtein = 0;
+                totalCarbs = 0;
+                totalFat = 0;
+                totalBurnedCalories = 0;
+                totalSport = 0;
+
+                localStorage.setItem('saveWater', 0);
+                localStorage.setItem('saveProtein', 0);
+                localStorage.setItem('saveCarbs', 0);
+                localStorage.setItem('saveFat', 0);
+                localStorage.setItem('saveBurnedCalories', 0);
+                localStorage.setItem('saveSport', 0);
+                
+                // Note: nutritionHistory et sportHistory ne sont pas supprimés 
+                // car ils servent d'archive pour les stats.
+            }
+            localStorage.setItem('lastResetDate', today);
+        }
+
+        function calculateBMR() {
+            if (!currentWeight || !userAge || !userHeight) return 2000;
+            let bmr;
+            if (userGender === 'homme') {
+                bmr = (10 * currentWeight) + (6.25 * userHeight) - (5 * userAge) + 5;
+            } else {
+                bmr = (10 * currentWeight) + (6.25 * userHeight) - (5 * userAge) - 161;
+            }
+            return Math.round(bmr);
+        }
+
+        function updateProfile() {
+            userAge = parseInt(document.getElementById('user-age').value);
+            userHeight = parseInt(document.getElementById('user-height').value);
+            userGender = document.getElementById('user-gender').value;
+            userActivity = parseFloat(document.getElementById('user-activity').value);
+            userGoal = document.getElementById('user-goal').value;
+            localStorage.setItem('userAge', userAge);
+            localStorage.setItem('userHeight', userHeight);
+            localStorage.setItem('userGender', userGender);
+            localStorage.setItem('userActivity', userActivity);
+            localStorage.setItem('userGoal', userGoal);
+            rafraichirAffichage();
+        }
+
+        const MET_VALUES = {
+            'Running': 10,
+            'Cycling': 8,
+            'Fitness': 5,
+            'Walking': 3.5,
+            'Other': 4
+        };
+
+        let sportHistory = JSON.parse(localStorage.getItem('sportHistory')) || [];
+        let sportChart;
+        let weightHistory = JSON.parse(localStorage.getItem('weightHistory')) || [];
+
+        function rafraichirAffichage() {
+            document.getElementById('user-age').value = userAge;
+            document.getElementById('user-height').value = userHeight;
+            document.getElementById('user-gender').value = userGender;
+            document.getElementById('user-activity').value = userActivity;
+            document.getElementById('user-goal').value = userGoal;
+
+            // Calcul automatique des objectifs : Prot (x2), Gluc (x3), Lip (x0.8)
+            if (currentWeight > 0) {
+                proteinGoal = Math.round(currentWeight * 2);
+                carbsGoal = Math.round(currentWeight * 3);
+                fatGoal = Math.round(currentWeight * 0.8);
+            }
+
+            document.getElementById('sport-goal-input').value = sportGoal;
+            document.getElementById('current-sport').innerText = totalSport;
+            document.getElementById('burned-calories').innerText = Math.round(totalBurnedCalories);
+            updateProgressBar('sport-bar', (totalSport / sportGoal) * 100);
+
+            document.getElementById('water-count').innerText = totalWater.toFixed(2);
+            updateProgressBar('water-bar', (totalWater / waterGoal) * 100);
+
+            document.getElementById('protein-goal-input').value = proteinGoal;
+            document.getElementById('carbs-goal-input').value = carbsGoal;
+            document.getElementById('fat-goal-input').value = fatGoal;
+
+            const totalCalories = (totalProtein * PROTEIN_CAL_PER_GRAM) +
+                                  (totalCarbs * CARB_CAL_PER_GRAM) +
+                                  (totalFat * FAT_CAL_PER_GRAM);
+
+            const bmr = calculateBMR();
+            const tdee = Math.round(bmr * userActivity);
+            
+            // Calcul de l'ajustement selon l'objectif et l'activité
+            let adjustment = 0;
+            if (userGoal === 'perte') {
+                if (userActivity <= 1.2) adjustment = -350;
+                else if (userActivity <= 1.375) adjustment = -450;
+                else adjustment = -600; 
+            } else if (userGoal === 'muscle') {
+                if (userActivity <= 1.2) adjustment = 0;
+                else if (userActivity <= 1.375) adjustment = 200;
+                else if (userActivity <= 1.55) adjustment = 250;
+                else adjustment = 300;
+            } else {
+                adjustment = 0; // Mixte / Maintenance
+            }
+
+            const targetCalories = tdee + adjustment;
+            
+            document.getElementById('bmr-display').innerText = bmr;
+            document.getElementById('tdee-display').innerText = tdee;
+            document.getElementById('target-display').innerText = targetCalories;
+            
+            // Besoin journalier = Cible (TDEE + Ajustement) + Sport réel saisi
+            const dailyNeed = targetCalories + totalBurnedCalories;
+            const remaining = dailyNeed - totalCalories;
+
+            document.getElementById('total-calories').innerText = Math.round(totalCalories);
+            document.getElementById('remaining-calories').innerText = Math.round(remaining);
+
+            document.getElementById('current-protein').innerText = totalProtein.toFixed(1);
+            updateProgressBar('protein-bar', (totalProtein / proteinGoal) * 100);
+
+            document.getElementById('current-carbs').innerText = totalCarbs.toFixed(1);
+            updateProgressBar('carbs-bar', (totalCarbs / carbsGoal) * 100);
+
+            document.getElementById('current-fat').innerText = totalFat.toFixed(1);
+            updateProgressBar('fat-bar', (totalFat / fatGoal) * 100);
+
+            document.getElementById('weight-goal-input').value = weightGoal;
+            document.getElementById('current-weight').innerText = currentWeight.toFixed(1);
+
+            let weightPct = 0;
+            if (weightHistory.length > 0 && weightGoal > 0) {
+                const startWeight = weightHistory[0].weight;
+                const initialGap = Math.abs(startWeight - weightGoal);
+                const currentGap = Math.abs(currentWeight - weightGoal);
+                if (initialGap === 0) {
+                    weightPct = 100;
+                } else {
+                    weightPct = ((initialGap - currentGap) / initialGap) * 100;
+                    weightPct = Math.min(100, Math.max(0, weightPct));
+                }
+            } else if (currentWeight > 0 && weightGoal > 0 && currentWeight === weightGoal) {
+                weightPct = 100;
+            }
+            updateProgressBar('weight-bar', weightPct);
+
+            updateSportHistoryDisplay();
+            updateNutritionHistoryDisplay();
+            updateChart();
+            updateWeightChart();
+        }
+
+        // Mise à jour des roues SVG (remplace updateProgressBar des barres)
+        function updateProgressBar(id, pct) {
+            const circle = document.getElementById(id);
+            const textEl = document.getElementById(id + '-text');
+            if (!circle || !textEl) return;
+
+            const wasCompleted = circle.classList.contains('is-completed');
+            const displayPct = Math.min(Math.max(0, pct), 100);
+            const offset = CIRCUMFERENCE - (displayPct / 100) * CIRCUMFERENCE;
+
+            circle.style.strokeDashoffset = offset;
+            textEl.innerText = Math.round(pct) + '%';
+
+            if (pct >= 100 && !wasCompleted) {
+                circle.classList.remove('animate-explosion');
+                void circle.getBBox(); // Force reflow SVG
+                circle.classList.add('animate-explosion');
+                circle.classList.add('is-completed');
+                setTimeout(() => circle.classList.remove('animate-explosion'), 600);
+            } else if (pct < 100) {
+                circle.classList.remove('is-completed');
+            }
+        }
+
+        function updateChart() {
+            const ctx = document.getElementById('sportChart').getContext('2d');
+            const monthlyData = new Array(12).fill(0);
+            const currentYear = new Date().getFullYear();
+
+            sportHistory.forEach(item => {
+                const dateEntry = new Date(item.date);
+                if (dateEntry.getFullYear() === currentYear) {
+                    monthlyData[dateEntry.getMonth()] += (item.time / 60);
+                }
+            });
+
+            const labels = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+
+            if (sportChart) {
+                sportChart.data.labels = labels;
+                sportChart.data.datasets[0].data = monthlyData;
+                sportChart.update();
+            } else {
+                sportChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Heures de sport',
+                            data: monthlyData,
+                            backgroundColor: '#ff51fc33',
+                            borderColor: '#29e79b',
+                            borderWidth: 2,
+                            borderRadius: 5,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: { beginAtZero: true, grid: { color: '#333' } },
+                            x: { grid: { display: false }, ticks: { autoSkip: false } }
+                        },
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            }
+        }
+
+        let weightChartInstance;
+
+        function updateWeightChart() {
+            const canvas = document.getElementById('weightChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            const labels = weightHistory.map(entry => new Date(entry.date).toLocaleDateString());
+            const data = weightHistory.map(entry => entry.weight);
+
+            if (weightChartInstance) {
+                weightChartInstance.data.labels = labels;
+                weightChartInstance.data.datasets[0].data = data;
+                weightChartInstance.update();
+            } else {
+                weightChartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Poids (kg)',
+                            data: data,
+                            borderColor: '#8e44ad',
+                            backgroundColor: 'rgba(142, 68, 173, 0.2)',
+                            tension: 0.4,
+                            fill: true,
+                            pointBackgroundColor: '#8e44ad',
+                            pointBorderColor: '#fff',
+                            pointHoverBackgroundColor: '#fff',
+                            pointHoverBorderColor: '#8e44ad',
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: { beginAtZero: false, grid: { color: '#333' } },
+                            x: { grid: { display: false } }
+                        },
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            }
+        }
+
+        function updateSportHistoryDisplay() {
+            const historyList = document.getElementById('sport-history');
+            historyList.innerHTML = '';
+            const today = new Date().toLocaleDateString('fr-CA');
+
+            sportHistory.forEach((item, index) => {
+                // On n'affiche dans la liste que les séances d'aujourd'hui
+                if (new Date(item.date).toLocaleDateString('fr-CA') !== today) return;
+
+                const li = document.createElement('li');
+                li.style.display = 'flex';
+                li.style.justifyContent = 'space-between';
+                li.style.alignItems = 'center';
+                li.style.padding = '3px 0';
+                li.style.borderBottom = '1px solid #333';
+
+                const textNode = document.createElement('span');
+                const calInfo = item.burned ? ` - ${Math.round(item.burned)} kcal` : '';
+                textNode.textContent = `${item.time} min de ${item.type}${calInfo} (${new Date(item.date).toLocaleDateString()})`;
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = '✕';
+                deleteBtn.className = 'btn-red';
+                deleteBtn.style.padding = '2px 6px';
+                deleteBtn.style.fontSize = '10px';
+                deleteBtn.style.minWidth = '25px';
+                deleteBtn.style.margin = '0';
+                deleteBtn.onclick = () => deleteSportEntry(index);
+
+                li.appendChild(textNode);
+                li.appendChild(deleteBtn);
+                historyList.appendChild(li);
+            });
+        }
+
+        function deleteSportEntry(index) {
+            if (!confirm("Voulez-vous vraiment supprimer cette séance ?")) return;
+            const entryToDelete = sportHistory[index];
+            const deletedTime = entryToDelete.time;
+            const deletedCalories = entryToDelete.burned || 0;
+            sportHistory.splice(index, 1);
+            totalSport = Math.max(0, totalSport - deletedTime);
+            totalBurnedCalories = Math.max(0, totalBurnedCalories - deletedCalories);
+            localStorage.setItem('sportHistory', JSON.stringify(sportHistory));
+            localStorage.setItem('saveSport', totalSport);
+            localStorage.setItem('saveBurnedCalories', totalBurnedCalories);
+            rafraichirAffichage();
+        }
+
+        function addSport() {
+            const sportInput = document.getElementById('sport-input');
+            const sportTypeInput = document.getElementById('sport-type');
+            const time = parseInt(sportInput.value);
+            const type = sportTypeInput.value.trim();
+            if (time > 0 && type !== '') {
+                totalSport += time;
+                const weightForCalc = currentWeight > 0 ? currentWeight : 70;
+                const met = MET_VALUES[type] || 4;
+                const burned = met * weightForCalc * (time / 60);
+                totalBurnedCalories += burned;
+                localStorage.setItem('saveSport', totalSport);
+                localStorage.setItem('saveBurnedCalories', totalBurnedCalories);
+                const newEntry = { time: time, type: type, date: new Date().toISOString(), burned: burned };
+                sportHistory.push(newEntry);
+                localStorage.setItem('sportHistory', JSON.stringify(sportHistory));
+                sportInput.value = '';
+                sportTypeInput.value = '';
+                rafraichirAffichage();
+            }
+        }
+
+        function resetSport() {
+            if (confirm("Voulez-vous réinitialiser le temps de sport ?")) {
+                totalSport = 0;
+                localStorage.setItem('saveSport', totalSport);
+                rafraichirAffichage();
+            }
+        }
+
+        function resetCalories() {
+            if (confirm("Voulez-vous réinitialiser le compteur de calories brûlées ?")) {
+                totalBurnedCalories = 0;
+                localStorage.setItem('saveBurnedCalories', totalBurnedCalories);
+                rafraichirAffichage();
+            }
+        }
+
+        function updateSportGoal() {
+            let newGoal = document.getElementById('sport-goal-input').value;
+            if (newGoal > 0) {
+                sportGoal = parseInt(newGoal);
+                localStorage.setItem('saveSportGoal', sportGoal);
+                rafraichirAffichage();
+            }
+        }
+
+        function addWater(amount) {
+            totalWater += amount;
+            localStorage.setItem('saveWater', totalWater);
+            rafraichirAffichage();
+        }
+
+        function resetWater() {
+            totalWater = 0;
+            localStorage.removeItem('saveWater');
+            rafraichirAffichage();
+        }
+
+        function addNutrition() {
+            const proteinInput = document.getElementById('add-protein');
+            const carbsInput = document.getElementById('add-carbs');
+            const fatInput = document.getElementById('add-fat');
+            const infoDisplay = document.getElementById('product-info');
+            
+            const addedProtein = parseFloat(proteinInput.value) || 0;
+            const addedCarbs = parseFloat(carbsInput.value) || 0;
+            const addedFat = parseFloat(fatInput.value) || 0;
+
+            let itemName = "Repas manuel";
+            if (infoDisplay.innerText.startsWith("Produit trouvé :")) {
+                itemName = infoDisplay.innerText.replace("Produit trouvé : ", "");
+            }
+
+            if (addedProtein > 0 || addedCarbs > 0 || addedFat > 0) {
+                totalProtein += addedProtein;
+                totalCarbs += addedCarbs;
+                totalFat += addedFat;
+
+                const newEntry = {
+                    name: itemName,
+                    p: addedProtein,
+                    c: addedCarbs,
+                    f: addedFat,
+                    date: new Date().toISOString()
+                };
+                nutritionHistory.push(newEntry);
+
+                localStorage.setItem('saveProtein', totalProtein);
+                localStorage.setItem('saveCarbs', totalCarbs);
+                localStorage.setItem('saveFat', totalFat);
+                localStorage.setItem('nutritionHistory', JSON.stringify(nutritionHistory));
+
+                proteinInput.value = '';
+                carbsInput.value = '';
+                fatInput.value = '';
+                document.getElementById('quantity-section').style.display = 'none';
+                infoDisplay.innerText = '';
+                rafraichirAffichage();
+            }
+        }
+
+        function updateNutritionHistoryDisplay() {
+            const historyList = document.getElementById('nutrition-history');
+            if (!historyList) return;
+            historyList.innerHTML = '';
+            const today = new Date().toLocaleDateString('fr-CA');
+
+            // On affiche les plus récents d'aujourd'hui en premier
+            [...nutritionHistory].reverse().forEach((item, index) => {
+                const realIndex = nutritionHistory.length - 1 - index;
+                
+                if (new Date(item.date).toLocaleDateString('fr-CA') !== today) return;
+
+                const li = document.createElement('li');
+                li.style.display = 'flex';
+                li.style.justifyContent = 'space-between';
+                li.style.alignItems = 'center';
+                li.style.padding = '5px 0';
+                li.style.borderBottom = '1px solid #333';
+
+                const textNode = document.createElement('span');
+                textNode.textContent = `${item.name} (P:${item.p}g, G:${item.c}g, L:${item.f}g)`;
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = '✕';
+                deleteBtn.className = 'btn-red';
+                deleteBtn.style.padding = '2px 6px';
+                deleteBtn.style.fontSize = '10px';
+                deleteBtn.style.minWidth = '25px';
+                deleteBtn.style.margin = '0';
+                deleteBtn.onclick = () => deleteNutritionEntry(realIndex);
+
+                li.appendChild(textNode);
+                li.appendChild(deleteBtn);
+                historyList.appendChild(li);
+            });
+        }
+
+        function deleteNutritionEntry(index) {
+            if (!confirm("Supprimer cet aliment ?")) return;
+            const entry = nutritionHistory[index];
+            totalProtein = Math.max(0, totalProtein - entry.p);
+            totalCarbs = Math.max(0, totalCarbs - entry.c);
+            totalFat = Math.max(0, totalFat - entry.f);
+            
+            nutritionHistory.splice(index, 1);
+            
+            localStorage.setItem('saveProtein', totalProtein);
+            localStorage.setItem('saveCarbs', totalCarbs);
+            localStorage.setItem('saveFat', totalFat);
+            localStorage.setItem('nutritionHistory', JSON.stringify(nutritionHistory));
+            
+            rafraichirAffichage();
+        }
+
+        function updateNutritionGoals() {
+            let newCarbsGoal = parseInt(document.getElementById('carbs-goal-input').value);
+            if (newCarbsGoal > 0) { carbsGoal = newCarbsGoal; localStorage.setItem('saveCarbsGoal', carbsGoal); }
+            rafraichirAffichage();
+        }
+
+        function resetNutrition() {
+            if (confirm("Réinitialiser toute la nutrition du jour ?")) {
+                totalProtein = 0; totalCarbs = 0; totalFat = 0;
+                nutritionHistory = [];
+                localStorage.removeItem('saveProtein');
+                localStorage.removeItem('saveCarbs');
+                localStorage.removeItem('saveFat');
+                localStorage.removeItem('nutritionHistory');
+                rafraichirAffichage();
+            }
+        }
+
+        function addWeight() {
+            const weightInput = document.getElementById('add-weight');
+            const newWeight = parseFloat(weightInput.value);
+            if (newWeight > 0) {
+                currentWeight = newWeight;
+                localStorage.setItem('saveWeight', currentWeight);
+                const newEntry = { date: new Date().toISOString(), weight: newWeight };
+                weightHistory.push(newEntry);
+                localStorage.setItem('weightHistory', JSON.stringify(weightHistory));
+                weightInput.value = '';
+                rafraichirAffichage();
+            }
+        }
+
+        function updateWeightGoal() {
+            let newGoal = parseFloat(document.getElementById('weight-goal-input').value);
+            if (newGoal > 0) {
+                weightGoal = newGoal;
+                localStorage.setItem('saveWeightGoal', weightGoal);
+                rafraichirAffichage();
+            }
+        }
+
+        function resetWeight() {
+            currentWeight = 0;
+            weightGoal = 60;
+            weightHistory = [];
+            localStorage.removeItem('saveWeight');
+            localStorage.removeItem('saveWeightGoal');
+            localStorage.removeItem('weightHistory');
+            rafraichirAffichage();
+        }
+
+        // --- SCANNER ET API OPENFOODFACTS ---
+        let html5QrCode;
+        function toggleScanner() {
+            const readerDiv = document.getElementById('reader');
+            const scanBtn = document.getElementById('scan-btn');
+
+            if (readerDiv.style.display === 'none') {
+                readerDiv.style.display = 'block';
+                scanBtn.innerText = "⏹ Arrêter le scan";
+                startScanner();
+            } else {
+                stopScanner();
+            }
+        }
+
+        function startScanner() {
+            html5QrCode = new Html5Qrcode("reader");
+            const config = { fps: 10, qrbox: { width: 250, height: 150 } };
+            html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess);
+        }
+
+        function stopScanner() {
+            if (html5QrCode) {
+                html5QrCode.stop().then(() => {
+                    document.getElementById('reader').style.display = 'none';
+                    document.getElementById('scan-btn').innerText = "📷 Scanner un produit";
+                });
+            }
+        }
+
+        function onScanSuccess(decodedText) {
+            stopScanner();
+            fetchProductData(decodedText);
+        }
+
+        // Stockage temporaire des macros pour 100g
+        let lastScannedMacros = { p: 0, c: 0, f: 0 };
+
+        function recalculateMacros() {
+            const qty = parseFloat(document.getElementById('product-quantity').value) || 0;
+            document.getElementById('add-protein').value = ((lastScannedMacros.p * qty) / 100).toFixed(1);
+            document.getElementById('add-carbs').value = ((lastScannedMacros.c * qty) / 100).toFixed(1);
+            document.getElementById('add-fat').value = ((lastScannedMacros.f * qty) / 100).toFixed(1);
+        }
+
+        async function fetchProductData(barcode) {
+            const infoDisplay = document.getElementById('product-info');
+            infoDisplay.innerText = "Recherche du produit...";
+            
+            try {
+                const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+                const data = await response.json();
+
+                if (data.status === 1) {
+                    const product = data.product;
+                    lastScannedMacros = {
+                        p: product.nutriments.proteins_100g || 0,
+                        c: product.nutriments.carbohydrates_100g || 0,
+                        f: product.nutriments.fat_100g || 0
+                    };
+
+                    document.getElementById('quantity-section').style.display = 'block';
+                    document.getElementById('product-quantity').value = 100;
+                    recalculateMacros();
+                    infoDisplay.innerText = `Produit trouvé : ${product.product_name || 'Inconnu'}`;
+                } else {
+                    infoDisplay.innerText = "Produit non trouvé.";
+                }
+            } catch (error) {
+                infoDisplay.innerText = "Erreur lors de la recherche.";
+            }
+        }
+
+        checkDailyReset();
+        rafraichirAffichage();
+    </script>
+
+</body>
+</html>
