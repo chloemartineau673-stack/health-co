@@ -165,6 +165,11 @@
 <body>
 
     <h1 style="text-align: center; color: white;">🍉 Health&Co 🍉</h1>
+    <div style="text-align: center; margin-top: -10px; margin-bottom: 20px; display: flex; justify-content: center; align-items: center; gap: 20px;">
+        <button onclick="changeDay(-1)" style="background:none; box-shadow:none; font-size: 1.5em; padding: 0;">⬅️</button>
+        <p id="current-date-display" style="color: var(--neon-green); font-weight: bold; font-size: 1.1em; margin: 0; min-width: 200px;"></p>
+        <button onclick="changeDay(1)" style="background:none; box-shadow:none; font-size: 1.5em; padding: 0;">➡️</button>
+    </div>
 
     <div class="dashboard">
         
@@ -343,6 +348,12 @@
                 <button onclick="toggleScanner()" id="scan-btn">📷 Scanner un produit</button>
             </div>
             
+            <div style="margin-bottom: 10px; display: flex; gap: 5px;">
+                <input type="text" id="food-search-input" placeholder="Rechercher (ex: Pomme, Poulet...)" style="flex-grow: 1; width: auto; margin-bottom: 0;">
+                <button onclick="searchFood()">🔍 Rechercher</button>
+            </div>
+            <div id="search-results" style="max-height: 200px; overflow-y: auto; background: #222; border-radius: 5px; margin-bottom: 10px; border: 1px solid #333;"></div>
+            
             <div id="quantity-section" style="display: none; margin-bottom: 15px; padding: 10px; border: 1px dashed var(--neon-green); border-radius: 8px;">
                 <label style="font-size: 0.9em; display: block; margin-bottom: 5px;">Quantité consommée (g) :</label>
                 <input type="number" id="product-quantity" value="100" oninput="recalculateMacros()" style="width: 100%; box-sizing: border-box;">
@@ -369,12 +380,9 @@
 
     <script>
         // 1. Initialisation
-        let totalSport = parseInt(localStorage.getItem('saveSport')) || 0;
-        let totalBurnedCalories = parseFloat(localStorage.getItem('saveBurnedCalories')) || 0;
-        let totalWater = parseFloat(localStorage.getItem('saveWater')) || 0;
-        let totalProtein = parseFloat(localStorage.getItem('saveProtein')) || 0;
-        let totalCarbs = parseFloat(localStorage.getItem('saveCarbs')) || 0;
-        let totalFat = parseFloat(localStorage.getItem('saveFat')) || 0;
+        let currentViewDate = new Date();
+        let sportHistory = JSON.parse(localStorage.getItem('sportHistory')) || [];
+        let waterHistory = JSON.parse(localStorage.getItem('waterHistory')) || [];
         let nutritionHistory = JSON.parse(localStorage.getItem('nutritionHistory')) || [];
         let currentWeight = parseFloat(localStorage.getItem('saveWeight')) || 0;
         let weightGoal = parseFloat(localStorage.getItem('saveWeightGoal')) || 60;
@@ -396,6 +404,14 @@
         const CARB_CAL_PER_GRAM = 4;
         const FAT_CAL_PER_GRAM = 9;
 
+        // Variables globales pour les totaux du jour affiché (recalculées à chaque refresh)
+        let totalSport = 0;
+        let totalBurnedCalories = 0;
+        let totalWater = 0;
+        let totalProtein = 0;
+        let totalCarbs = 0;
+        let totalFat = 0;
+
         // Circonférence pour r=42 : 2 * π * 42 ≈ 263.89
         const CIRCUMFERENCE = 2 * Math.PI * 42;
 
@@ -405,25 +421,21 @@
             const lastDate = localStorage.getItem('lastResetDate');
 
             if (lastDate && lastDate !== today) {
-                // C'est un nouveau jour ! On remet les compteurs à zéro
-                totalWater = 0;
-                totalProtein = 0;
-                totalCarbs = 0;
-                totalFat = 0;
-                totalBurnedCalories = 0;
-                totalSport = 0;
-
-                localStorage.setItem('saveWater', 0);
-                localStorage.setItem('saveProtein', 0);
-                localStorage.setItem('saveCarbs', 0);
-                localStorage.setItem('saveFat', 0);
-                localStorage.setItem('saveBurnedCalories', 0);
-                localStorage.setItem('saveSport', 0);
-                
-                // Note: nutritionHistory et sportHistory ne sont pas supprimés 
-                // car ils servent d'archive pour les stats.
+                currentViewDate = new Date();
             }
             localStorage.setItem('lastResetDate', today);
+        }
+
+        function changeDay(delta) {
+            currentViewDate.setDate(currentViewDate.getDate() + delta);
+            rafraichirAffichage();
+        }
+
+        function getTimestampForEntry() {
+            const now = new Date();
+            const entryDate = new Date(currentViewDate);
+            entryDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+            return entryDate.toISOString();
         }
 
         function calculateBMR() {
@@ -459,11 +471,41 @@
             'Other': 4
         };
 
-        let sportHistory = JSON.parse(localStorage.getItem('sportHistory')) || [];
         let sportChart;
-        let weightHistory = JSON.parse(localStorage.getItem('weightHistory')) || [];
 
         function rafraichirAffichage() {
+            const viewDateStr = currentViewDate.toLocaleDateString('fr-CA');
+
+            // Recalcul des totaux pour le jour affiché à partir des historiques
+            totalSport = 0; totalBurnedCalories = 0;
+            sportHistory.forEach(item => {
+                if (new Date(item.date).toLocaleDateString('fr-CA') === viewDateStr) {
+                    totalSport += item.time;
+                    totalBurnedCalories += (item.burned || 0);
+                }
+            });
+
+            totalWater = 0;
+            waterHistory.forEach(item => {
+                if (new Date(item.date).toLocaleDateString('fr-CA') === viewDateStr) {
+                    totalWater += item.amount;
+                }
+            });
+
+            totalProtein = 0; totalCarbs = 0; totalFat = 0;
+            nutritionHistory.forEach(item => {
+                if (new Date(item.date).toLocaleDateString('fr-CA') === viewDateStr) {
+                    totalProtein += item.p;
+                    totalCarbs += item.c;
+                    totalFat += item.f;
+                }
+            });
+
+            // Affichage de la date du jour
+            const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+            let dateStr = currentViewDate.toLocaleDateString('fr-FR', options);
+            document.getElementById('current-date-display').innerText = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+
             document.getElementById('user-age').value = userAge;
             document.getElementById('user-height').value = userHeight;
             document.getElementById('user-gender').value = userGender;
@@ -673,11 +715,11 @@
         function updateSportHistoryDisplay() {
             const historyList = document.getElementById('sport-history');
             historyList.innerHTML = '';
-            const today = new Date().toLocaleDateString('fr-CA');
+            const viewDateStr = currentViewDate.toLocaleDateString('fr-CA');
 
             sportHistory.forEach((item, index) => {
-                // On n'affiche dans la liste que les séances d'aujourd'hui
-                if (new Date(item.date).toLocaleDateString('fr-CA') !== today) return;
+                // On n'affiche dans la liste que les séances du jour sélectionné
+                if (new Date(item.date).toLocaleDateString('fr-CA') !== viewDateStr) return;
 
                 const li = document.createElement('li');
                 li.style.display = 'flex';
@@ -707,15 +749,8 @@
 
         function deleteSportEntry(index) {
             if (!confirm("Voulez-vous vraiment supprimer cette séance ?")) return;
-            const entryToDelete = sportHistory[index];
-            const deletedTime = entryToDelete.time;
-            const deletedCalories = entryToDelete.burned || 0;
             sportHistory.splice(index, 1);
-            totalSport = Math.max(0, totalSport - deletedTime);
-            totalBurnedCalories = Math.max(0, totalBurnedCalories - deletedCalories);
             localStorage.setItem('sportHistory', JSON.stringify(sportHistory));
-            localStorage.setItem('saveSport', totalSport);
-            localStorage.setItem('saveBurnedCalories', totalBurnedCalories);
             rafraichirAffichage();
         }
 
@@ -725,14 +760,10 @@
             const time = parseInt(sportInput.value);
             const type = sportTypeInput.value.trim();
             if (time > 0 && type !== '') {
-                totalSport += time;
                 const weightForCalc = currentWeight > 0 ? currentWeight : 70;
                 const met = MET_VALUES[type] || 4;
                 const burned = met * weightForCalc * (time / 60);
-                totalBurnedCalories += burned;
-                localStorage.setItem('saveSport', totalSport);
-                localStorage.setItem('saveBurnedCalories', totalBurnedCalories);
-                const newEntry = { time: time, type: type, date: new Date().toISOString(), burned: burned };
+                const newEntry = { time: time, type: type, date: getTimestampForEntry(), burned: burned };
                 sportHistory.push(newEntry);
                 localStorage.setItem('sportHistory', JSON.stringify(sportHistory));
                 sportInput.value = '';
@@ -742,19 +773,16 @@
         }
 
         function resetSport() {
-            if (confirm("Voulez-vous réinitialiser le temps de sport ?")) {
-                totalSport = 0;
-                localStorage.setItem('saveSport', totalSport);
+            if (confirm("Réinitialiser le sport de ce jour ?")) {
+                const viewDateStr = currentViewDate.toLocaleDateString('fr-CA');
+                sportHistory = sportHistory.filter(item => new Date(item.date).toLocaleDateString('fr-CA') !== viewDateStr);
+                localStorage.setItem('sportHistory', JSON.stringify(sportHistory));
                 rafraichirAffichage();
             }
         }
 
         function resetCalories() {
-            if (confirm("Voulez-vous réinitialiser le compteur de calories brûlées ?")) {
-                totalBurnedCalories = 0;
-                localStorage.setItem('saveBurnedCalories', totalBurnedCalories);
-                rafraichirAffichage();
-            }
+            resetSport(); // Les calories sont liées aux séances dans ce système
         }
 
         function updateSportGoal() {
@@ -767,15 +795,19 @@
         }
 
         function addWater(amount) {
-            totalWater += amount;
-            localStorage.setItem('saveWater', totalWater);
+            const newEntry = { amount: amount, date: getTimestampForEntry() };
+            waterHistory.push(newEntry);
+            localStorage.setItem('waterHistory', JSON.stringify(waterHistory));
             rafraichirAffichage();
         }
 
         function resetWater() {
-            totalWater = 0;
-            localStorage.removeItem('saveWater');
-            rafraichirAffichage();
+            if (confirm("Réinitialiser l'eau de ce jour ?")) {
+                const viewDateStr = currentViewDate.toLocaleDateString('fr-CA');
+                waterHistory = waterHistory.filter(item => new Date(item.date).toLocaleDateString('fr-CA') !== viewDateStr);
+                localStorage.setItem('waterHistory', JSON.stringify(waterHistory));
+                rafraichirAffichage();
+            }
         }
 
         function addNutrition() {
@@ -794,22 +826,15 @@
             }
 
             if (addedProtein > 0 || addedCarbs > 0 || addedFat > 0) {
-                totalProtein += addedProtein;
-                totalCarbs += addedCarbs;
-                totalFat += addedFat;
-
                 const newEntry = {
                     name: itemName,
                     p: addedProtein,
                     c: addedCarbs,
                     f: addedFat,
-                    date: new Date().toISOString()
+                    date: getTimestampForEntry()
                 };
                 nutritionHistory.push(newEntry);
 
-                localStorage.setItem('saveProtein', totalProtein);
-                localStorage.setItem('saveCarbs', totalCarbs);
-                localStorage.setItem('saveFat', totalFat);
                 localStorage.setItem('nutritionHistory', JSON.stringify(nutritionHistory));
 
                 proteinInput.value = '';
@@ -825,13 +850,13 @@
             const historyList = document.getElementById('nutrition-history');
             if (!historyList) return;
             historyList.innerHTML = '';
-            const today = new Date().toLocaleDateString('fr-CA');
+            const viewDateStr = currentViewDate.toLocaleDateString('fr-CA');
 
-            // On affiche les plus récents d'aujourd'hui en premier
+            // On affiche les plus récents du jour sélectionné en premier
             [...nutritionHistory].reverse().forEach((item, index) => {
                 const realIndex = nutritionHistory.length - 1 - index;
                 
-                if (new Date(item.date).toLocaleDateString('fr-CA') !== today) return;
+                if (new Date(item.date).toLocaleDateString('fr-CA') !== viewDateStr) return;
 
                 const li = document.createElement('li');
                 li.style.display = 'flex';
@@ -860,18 +885,8 @@
 
         function deleteNutritionEntry(index) {
             if (!confirm("Supprimer cet aliment ?")) return;
-            const entry = nutritionHistory[index];
-            totalProtein = Math.max(0, totalProtein - entry.p);
-            totalCarbs = Math.max(0, totalCarbs - entry.c);
-            totalFat = Math.max(0, totalFat - entry.f);
-            
             nutritionHistory.splice(index, 1);
-            
-            localStorage.setItem('saveProtein', totalProtein);
-            localStorage.setItem('saveCarbs', totalCarbs);
-            localStorage.setItem('saveFat', totalFat);
             localStorage.setItem('nutritionHistory', JSON.stringify(nutritionHistory));
-            
             rafraichirAffichage();
         }
 
@@ -883,11 +898,8 @@
 
         function resetNutrition() {
             if (confirm("Réinitialiser toute la nutrition du jour ?")) {
-                totalProtein = 0; totalCarbs = 0; totalFat = 0;
-                nutritionHistory = [];
-                localStorage.removeItem('saveProtein');
-                localStorage.removeItem('saveCarbs');
-                localStorage.removeItem('saveFat');
+                const viewDateStr = currentViewDate.toLocaleDateString('fr-CA');
+                nutritionHistory = nutritionHistory.filter(item => new Date(item.date).toLocaleDateString('fr-CA') !== viewDateStr);
                 localStorage.removeItem('nutritionHistory');
                 rafraichirAffichage();
             }
@@ -899,7 +911,7 @@
             if (newWeight > 0) {
                 currentWeight = newWeight;
                 localStorage.setItem('saveWeight', currentWeight);
-                const newEntry = { date: new Date().toISOString(), weight: newWeight };
+                const newEntry = { date: getTimestampForEntry(), weight: newWeight };
                 weightHistory.push(newEntry);
                 localStorage.setItem('weightHistory', JSON.stringify(weightHistory));
                 weightInput.value = '';
@@ -997,6 +1009,78 @@
             } catch (error) {
                 infoDisplay.innerText = "Erreur lors de la recherche.";
             }
+        }
+
+        // --- RECHERCHE DE PRODUITS ---
+        async function searchFood() {
+            const query = document.getElementById('food-search-input').value.trim();
+            const resultsDiv = document.getElementById('search-results');
+            
+            if (query.length < 2) {
+                alert("Veuillez saisir au moins 2 caractères.");
+                return;
+            }
+            
+            resultsDiv.innerHTML = `<p style='padding:10px;'>🔍 Recherche de "${query}"...</p>`;
+            
+            try {
+                // Utilisation du domaine mondial (world) qui est le plus stable
+                // Suppression des headers personnalisés qui peuvent bloquer la requête (CORS)
+                const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=20`;
+
+                const response = await fetch(url);
+
+                if (!response.ok) throw new Error(`Erreur serveur (${response.status})`);
+
+                const data = await response.json();
+                
+                resultsDiv.innerHTML = "";
+                if (data.products && data.products.length > 0) {
+                    data.products.forEach(product => {
+                        if (!product.product_name) return; // Ignore les produits sans nom
+
+                        const btn = document.createElement('div');
+                        btn.style = "padding: 10px; border-bottom: 1px solid #333; cursor: pointer; font-size: 0.9em; transition: background 0.2s;";
+                        
+                        const brand = product.brands ? ` - ${product.brands}` : '';
+                        const kcal = product.nutriments && product.nutriments['energy-kcal_100g'] 
+                            ? ` (${Math.round(product.nutriments['energy-kcal_100g'])} kcal/100g)` 
+                            : '';
+
+                        btn.innerHTML = `<strong>${product.product_name}</strong>${brand}<br><span style="color:#888; font-size:0.8em;">${kcal}</span>`;
+                        
+                        btn.onmouseover = () => btn.style.background = "#333";
+                        btn.onmouseout = () => btn.style.background = "transparent";
+                        btn.onclick = () => selectProduct(product);
+                        resultsDiv.appendChild(btn);
+                    });
+                } else {
+                    resultsDiv.innerHTML = "<p style='padding:10px;'>Aucun résultat trouvé pour cette recherche.</p>";
+                }
+            } catch (error) {
+                console.error("Search error:", error);
+                resultsDiv.innerHTML = `<p style='padding:10px; color: #ff6b6b;'>Erreur : ${error.message}. Vérifiez votre connexion ou essayez un autre terme.</p>`;
+            }
+        }
+
+        function selectProduct(product) {
+            if (!product.nutriments) {
+                alert("Données nutritionnelles indisponibles pour ce produit.");
+                return;
+            }
+
+            lastScannedMacros = {
+                p: product.nutriments.proteins_100g || product.nutriments.proteins || 0,
+                c: product.nutriments.carbohydrates_100g || product.nutriments.carbohydrates || 0,
+                f: product.nutriments.fat_100g || product.nutriments.fat || 0
+            };
+
+            document.getElementById('quantity-section').style.display = 'block';
+            document.getElementById('product-quantity').value = 100;
+            recalculateMacros();
+            document.getElementById('product-info').innerText = `Produit trouvé : ${product.product_name || 'Inconnu'}`;
+            document.getElementById('search-results').innerHTML = ""; // Efface les résultats
+            document.getElementById('food-search-input').value = ""; // Efface le champ
         }
 
         checkDailyReset();
