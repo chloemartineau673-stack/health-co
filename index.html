@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#0f0f0f">
 
@@ -384,6 +385,7 @@
         let sportHistory = JSON.parse(localStorage.getItem('sportHistory')) || [];
         let waterHistory = JSON.parse(localStorage.getItem('waterHistory')) || [];
         let nutritionHistory = JSON.parse(localStorage.getItem('nutritionHistory')) || [];
+        let weightHistory = JSON.parse(localStorage.getItem('weightHistory')) || [];
         let currentWeight = parseFloat(localStorage.getItem('saveWeight')) || 0;
         let weightGoal = parseFloat(localStorage.getItem('saveWeightGoal')) || 60;
 
@@ -1016,6 +1018,11 @@
             const query = document.getElementById('food-search-input').value.trim();
             const resultsDiv = document.getElementById('search-results');
             
+            if (window.location.protocol === 'file:') {
+                alert("⚠️ La recherche ne peut pas fonctionner si vous ouvrez le fichier directement (file://). \n\nVeuillez utiliser un serveur local (comme l'extension 'Live Server' sur VS Code).");
+                return;
+            }
+
             if (query.length < 2) {
                 alert("Veuillez saisir au moins 2 caractères.");
                 return;
@@ -1024,14 +1031,11 @@
             resultsDiv.innerHTML = `<p style='padding:10px;'>🔍 Recherche de "${query}"...</p>`;
             
             try {
-                // Utilisation du domaine mondial (world) qui est le plus stable
-                // Suppression des headers personnalisés qui peuvent bloquer la requête (CORS)
-                const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=20`;
+                const url = `https://world.openfoodfacts.org/api/v2/search?search_terms=${encodeURIComponent(query)}&fields=product_name,brands,nutriments,image_small_url&page_size=20`;
 
-                const response = await fetch(url);
-
-                if (!response.ok) throw new Error(`Erreur serveur (${response.status})`);
-
+                console.log("Tentative de recherche sur :", url);
+                const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const data = await response.json();
                 
                 resultsDiv.innerHTML = "";
@@ -1040,14 +1044,17 @@
                         if (!product.product_name) return; // Ignore les produits sans nom
 
                         const btn = document.createElement('div');
-                        btn.style = "padding: 10px; border-bottom: 1px solid #333; cursor: pointer; font-size: 0.9em; transition: background 0.2s;";
+                        btn.style = "padding: 10px; border-bottom: 1px solid #333; cursor: pointer; font-size: 0.9em; transition: background 0.2s; display: flex; align-items: center; gap: 10px;";
                         
+                        const imgUrl = product.image_small_url || 'https://via.placeholder.com/40?text=NO';
+                        const imgHtml = `<img src="${imgUrl}" style="width: 40px; height: 40px; border-radius: 4px; object-fit: cover; background: #333;">`;
+
                         const brand = product.brands ? ` - ${product.brands}` : '';
                         const kcal = product.nutriments && product.nutriments['energy-kcal_100g'] 
                             ? ` (${Math.round(product.nutriments['energy-kcal_100g'])} kcal/100g)` 
                             : '';
 
-                        btn.innerHTML = `<strong>${product.product_name}</strong>${brand}<br><span style="color:#888; font-size:0.8em;">${kcal}</span>`;
+                        btn.innerHTML = `${imgHtml} <div><strong>${product.product_name}</strong>${brand}<br><span style="color:#888; font-size:0.8em;">${kcal}</span></div>`;
                         
                         btn.onmouseover = () => btn.style.background = "#333";
                         btn.onmouseout = () => btn.style.background = "transparent";
