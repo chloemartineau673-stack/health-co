@@ -386,6 +386,7 @@
         let waterHistory = JSON.parse(localStorage.getItem('waterHistory')) || [];
         let nutritionHistory = JSON.parse(localStorage.getItem('nutritionHistory')) || [];
         let weightHistory = JSON.parse(localStorage.getItem('weightHistory')) || [];
+        let weightHistory = JSON.parse(localStorage.getItem('weightHistory')) || [];
         let currentWeight = parseFloat(localStorage.getItem('saveWeight')) || 0;
         let weightGoal = parseFloat(localStorage.getItem('saveWeightGoal')) || 60;
 
@@ -902,7 +903,7 @@
             if (confirm("Réinitialiser toute la nutrition du jour ?")) {
                 const viewDateStr = currentViewDate.toLocaleDateString('fr-CA');
                 nutritionHistory = nutritionHistory.filter(item => new Date(item.date).toLocaleDateString('fr-CA') !== viewDateStr);
-                localStorage.removeItem('nutritionHistory');
+                localStorage.setItem('nutritionHistory', JSON.stringify(nutritionHistory));
                 rafraichirAffichage();
             }
         }
@@ -1017,77 +1018,90 @@
         async function searchFood() {
             const query = document.getElementById('food-search-input').value.trim();
             const resultsDiv = document.getElementById('search-results');
-            
-            if (window.location.protocol === 'file:') {
-                alert("⚠️ La recherche ne peut pas fonctionner si vous ouvrez le fichier directement (file://). \n\nVeuillez utiliser un serveur local (comme l'extension 'Live Server' sur VS Code).");
-                return;
-            }
 
-            if (query.length < 2) {
-                alert("Veuillez saisir au moins 2 caractères.");
-                return;
-            }
-            
+            if (query.length < 2) { alert("Veuillez saisir au moins 2 caractères."); return; }
+
             resultsDiv.innerHTML = `<p style='padding:10px;'>🔍 Recherche de "${query}"...</p>`;
-            
+            let hasResults = false;
+
+            // --- USDA (aliments bruts) ---
             try {
-                const url = `https://world.openfoodfacts.org/api/v2/search?search_terms=${encodeURIComponent(query)}&fields=product_name,brands,nutriments,image_small_url&page_size=20`;
-
-                console.log("Tentative de recherche sur :", url);
-                const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const data = await response.json();
-                
-                resultsDiv.innerHTML = "";
-                if (data.products && data.products.length > 0) {
-                    data.products.forEach(product => {
-                        if (!product.product_name) return; // Ignore les produits sans nom
-
-                        const btn = document.createElement('div');
-                        btn.style = "padding: 10px; border-bottom: 1px solid #333; cursor: pointer; font-size: 0.9em; transition: background 0.2s; display: flex; align-items: center; gap: 10px;";
-                        
-                        const imgUrl = product.image_small_url || 'https://via.placeholder.com/40?text=NO';
-                        const imgHtml = `<img src="${imgUrl}" style="width: 40px; height: 40px; border-radius: 4px; object-fit: cover; background: #333;">`;
-
-                        const brand = product.brands ? ` - ${product.brands}` : '';
-                        const kcal = product.nutriments && product.nutriments['energy-kcal_100g'] 
-                            ? ` (${Math.round(product.nutriments['energy-kcal_100g'])} kcal/100g)` 
-                            : '';
-
-                        btn.innerHTML = `${imgHtml} <div><strong>${product.product_name}</strong>${brand}<br><span style="color:#888; font-size:0.8em;">${kcal}</span></div>`;
-                        
-                        btn.onmouseover = () => btn.style.background = "#333";
-                        btn.onmouseout = () => btn.style.background = "transparent";
-                        btn.onclick = () => selectProduct(product);
-                        resultsDiv.appendChild(btn);
+                const usdaRes = await fetch(`https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(query)}&dataType=Foundation,SR%20Legacy&pageSize=8&api_key=DEMO_KEY`);
+                if (usdaRes.ok) {
+                    const usdaData = await usdaRes.json();
+                    if (resultsDiv.innerHTML.includes('Recherche')) resultsDiv.innerHTML = '';
+                    (usdaData.foods || []).forEach(food => {
+                        const nutrients = food.foodNutrients || [];
+                        const get = (name) => {
+                            const n = nutrients.find(n => n.nutrientName?.toLowerCase().includes(name));
+                            return n ? parseFloat(n.value) || 0 : 0;
+                        };
+                        appendResult(resultsDiv, {
+                            name: food.description,
+                            brand: '🥦 Aliment brut (USDA)',
+                            kcal: get('energy'),
+                            macros: { p: get('protein'), c: get('carbohydrate'), f: get('total lipid') },
+                            img: null
+                        });
+                        hasResults = true;
                     });
-                } else {
-                    resultsDiv.innerHTML = "<p style='padding:10px;'>Aucun résultat trouvé pour cette recherche.</p>";
                 }
-            } catch (error) {
-                console.error("Search error:", error);
-                resultsDiv.innerHTML = `<p style='padding:10px; color: #ff6b6b;'>Erreur : ${error.message}. Vérifiez votre connexion ou essayez un autre terme.</p>`;
+            } catch (e) {
+                console.warn("USDA indisponible:", e.message);
+            }
+
+            // --- OpenFoodFacts (produits emballés) ---
+            try {
+                const offRes = await fetch(`https://world.openfoodfacts.org/api/v2/search?search_terms=${encodeURIComponent(query)}&fields=product_name,brands,nutriments,image_small_url&page_size=10`, { headers: { 'Accept': 'application/json' } });
+                if (offRes.ok) {
+                    const offData = await offRes.ok ? await offRes.json() : null;
+                    if (offData && resultsDiv.innerHTML.includes('Recherche')) resultsDiv.innerHTML = '';
+                    if (offData && offData.products) {
+                        offData.products.filter(p => p.product_name).forEach(product => {
+                            appendResult(resultsDiv, {
+                                name: product.product_name,
+                                brand: product.brands ? `🏪 ${product.brands}` : '🏪 Produit emballé',
+                                kcal: product.nutriments?.['energy-kcal_100g'],
+                                macros: {
+                                    p: product.nutriments?.proteins_100g || 0,
+                                    c: product.nutriments?.carbohydrates_100g || 0,
+                                    f: product.nutriments?.fat_100g || 0
+                                },
+                                img: product.image_small_url
+                            });
+                            hasResults = true;
+                        });
+                    }
+                }
+            } catch (e) {
+                console.warn("OpenFoodFacts indisponible:", e.message);
+            }
+
+            if (!hasResults) {
+                resultsDiv.innerHTML = "<p style='padding:10px;'>Aucun résultat trouvé. Essayez en anglais (ex: apple, chicken...).</p>";
             }
         }
 
-        function selectProduct(product) {
-            if (!product.nutriments) {
-                alert("Données nutritionnelles indisponibles pour ce produit.");
-                return;
-            }
-
-            lastScannedMacros = {
-                p: product.nutriments.proteins_100g || product.nutriments.proteins || 0,
-                c: product.nutriments.carbohydrates_100g || product.nutriments.carbohydrates || 0,
-                f: product.nutriments.fat_100g || product.nutriments.fat || 0
+        function appendResult(container, { name, brand, kcal, macros, img }) {
+            const div = document.createElement('div');
+            div.style = "padding: 10px; border-bottom: 1px solid #333; cursor: pointer; font-size: 0.9em; display: flex; align-items: center; gap: 10px;";
+            const imgHtml = img
+                ? `<img src="${img}" style="width:40px;height:40px;border-radius:4px;object-fit:cover;background:#333;">`
+                : `<div style="width:40px;height:40px;border-radius:4px;background:#2a2a2a;display:flex;align-items:center;justify-content:center;font-size:1.4em;">🥗</div>`;
+            const kcalStr = kcal ? ` (${Math.round(kcal)} kcal/100g)` : '';
+            div.innerHTML = `${imgHtml}<div><strong>${name}</strong><br><span style="color:#888;font-size:0.8em;">${brand}${kcalStr}</span></div>`;
+            div.onmouseover = () => div.style.background = "#333";
+            div.onmouseout = () => div.style.background = "transparent";
+            div.onclick = () => {
+                lastScannedMacros = macros;
+                document.getElementById('quantity-section').style.display = 'block';
+                document.getElementById('product-quantity').value = 100;
+                recalculateMacros();
+                document.getElementById('product-info').innerText = `Produit trouvé : ${name}`;
+                container.innerHTML = "";
+                document.getElementById('food-search-input').value = "";
             };
-
-            document.getElementById('quantity-section').style.display = 'block';
-            document.getElementById('product-quantity').value = 100;
-            recalculateMacros();
-            document.getElementById('product-info').innerText = `Produit trouvé : ${product.product_name || 'Inconnu'}`;
-            document.getElementById('search-results').innerHTML = ""; // Efface les résultats
-            document.getElementById('food-search-input').value = ""; // Efface le champ
+            container.appendChild(div);
         }
 
         checkDailyReset();
